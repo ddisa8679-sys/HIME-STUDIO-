@@ -1,8 +1,12 @@
 import React, { useMemo, useState } from "react";
+import { Image, Alert } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 type Role = "client" | "master";
-type Tab = "home" | "designs" | "masters" | "profile";
+type Tab = "home" | "designs" | "masters" | "profile" | "blog";
+type Post = { id: number; uri: string; kind: string; caption: string };
+type Price = { id: number; title: string; amount: string };
 
 const burgundy = "#651D32";
 const ink = "#171316";
@@ -36,11 +40,36 @@ export default function App() {
   const [role, setRole] = useState<Role | null>(null);
   const [tab, setTab] = useState<Tab>("home");
   const [city, setCity] = useState("Екатеринбург");
+  const [masterCity, setMasterCity] = useState("Екатеринбург");
+  const [masterName, setMasterName] = useState("");
+  const [masterBio, setMasterBio] = useState("");
+  const [masterPhoto, setMasterPhoto] = useState<string | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postCaption, setPostCaption] = useState("");
+  const [prices, setPrices] = useState<Price[]>([{id:1,title:"Маникюр с покрытием",amount:"2000"},{id:2,title:"Укрепление",amount:"500"},{id:3,title:"Дизайн",amount:"от 100"}]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("Все");
   const [saved, setSaved] = useState<string[]>([]);
-  const filteredMasters = useMemo(() => masters.filter(m => m.city.toLowerCase().includes(query.toLowerCase()) || m.name.toLowerCase().includes(query.toLowerCase())), [query]);
+  const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))), [query, city]);
   const toggleSaved = (name: string) => setSaved(old => old.includes(name) ? old.filter(x => x !== name) : [...old, name]);
+
+
+  const pickMedia = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { Alert.alert("Нужен доступ к галерее", "Разреши доступ, чтобы выбрать фото или видео работы."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, allowsEditing: false, quality: 0.85 });
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      setPosts(old => [{ id: Date.now(), uri: asset.uri, kind: asset.type || "media", caption: postCaption.trim() }, ...old]);
+      setPostCaption("");
+    }
+  };
+  const pickMasterPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { Alert.alert("Нужен доступ к галерее", "Разреши доступ, чтобы выбрать фото профиля."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.85 });
+    if (!result.canceled && result.assets?.[0]) setMasterPhoto(result.assets[0].uri);
+  };
 
   if (!role) return (
     <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
@@ -67,7 +96,7 @@ export default function App() {
           <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
           <Text style={styles.body}>{isClient ? "Вдохновляйся дизайнами, находи мастеров рядом и выбирай то, что нравится именно тебе." : "Покажи свои работы, расскажи о себе и находи клиентов в своём городе."}</Text>
           {isClient ? <>
-            <SectionTitle title="Город" /><TextInput value={city} onChangeText={setCity} placeholder="Укажи свой город" style={styles.input} />
+            <SectionTitle title="Город" /><TextInput value={city} onChangeText={setCity} placeholder="Укажи свой город" style={styles.input} /><Text style={styles.small}>Показываем только мастеров из выбранного города.</Text>
             <SectionTitle title="Популярные дизайны" action="Все дизайны" />
             {designs.slice(0, 2).map((d, i) => <DesignCard key={d.title} item={d} index={i} />)}
             <SectionTitle title="Мастера рядом" action="Все мастера" />
@@ -75,6 +104,7 @@ export default function App() {
             <Button title="Открыть каталог мастеров" onPress={() => setTab("masters")} />
           </> : <>
             <View style={styles.masterIntro}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Твоя страница мастера</Text><Text style={styles.small}>Добавь фото, город и описание, чтобы клиенты могли тебя найти.</Text></View></View>
+            <SectionTitle title="Мой блог" /><Text style={styles.small}>Публикуй фото и видео своих работ.</Text><Button title="Добавить фото или видео" onPress={() => setTab("blog")} /><SectionTitle title="Мой прайс" />{prices.map(p => <Text style={styles.priceLine} key={p.id}>{p.title} · {p.amount} ₽</Text>)}<Button title="Редактировать прайс" secondary onPress={() => setTab("profile")} />
             <SectionTitle title="Быстрый старт" />
             {["Заполни описание и услуги", "Добавь фотографии своих работ", "Укажи город и свободное время", "Собирай отзывы клиентов"].map((s, i) => <View style={styles.step} key={s}><Text style={styles.stepNo}>0{i + 1}</Text><Text style={styles.stepText}>{s}</Text></View>)}
             <Button title="Перейти в мой профиль" onPress={() => setTab("profile")} />
@@ -87,25 +117,34 @@ export default function App() {
         </>}
         {tab === "masters" && <>
           <Text style={styles.kicker}>FIND YOUR NAIL ARTIST</Text><Text style={styles.pageTitle}>Каталог мастеров</Text><Text style={styles.body}>Поиск по городу. Смотри портфолио, рейтинг и отзывы перед записью.</Text>
-          <TextInput value={query} onChangeText={setQuery} placeholder="Введи город или имя мастера" style={styles.input} />
+          <TextInput value={query} onChangeText={setQuery} placeholder="Поиск по имени или услуге" style={styles.input} /><Text style={styles.small}>Город каталога: {city}</Text>
           {filteredMasters.map((m, i) => <MasterCard key={i} item={m} onPress={() => toggleSaved(m.name + m.city)} saved={saved.includes(m.name + m.city)} />)}
-          {filteredMasters.length === 0 && <Text style={styles.small}>Пока никого не нашли. Проверь название города.</Text>}
+          {filteredMasters.length === 0 && <Text style={styles.small}>В выбранном городе пока нет мастеров в демонстрационном списке. Другие города не показываются.</Text>}
+        </>}
+
+        {tab === "blog" && <>
+          <Text style={styles.kicker}>MASTER BLOG</Text><Text style={styles.pageTitle}>Мои работы</Text>
+          <Text style={styles.body}>Добавляй фотографии и видео своих работ.</Text>
+          <TextInput value={postCaption} onChangeText={setPostCaption} placeholder="Подпись к публикации..." style={[styles.input,styles.multiline]} multiline />
+          <Button title="Выбрать фото или видео из галереи" onPress={pickMedia} />
+          {posts.length === 0 && <Text style={styles.small}>Публикаций пока нет. Добавь первую работу.</Text>}
+          {posts.map(post=><View key={post.id} style={styles.postCard}><Image source={{uri:post.uri}} style={styles.postImage} /><Text style={styles.tag}>{post.kind === "video" ? "ВИДЕО" : "ФОТО"}</Text>{!!post.caption && <Text style={styles.cardTitle}>{post.caption}</Text>}</View>)}
         </>}
         {tab === "profile" && <>
           <Text style={styles.kicker}>YOUR HIME PROFILE</Text><Text style={styles.pageTitle}>{isClient ? "Мой профиль" : "Профиль мастера"}</Text>
-          <View style={styles.profileTop}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{isClient ? "Твоё имя" : "Имя мастера"}</Text><Text style={styles.small}>Фото можно будет добавить в профиле.</Text></View></View>
+          <View style={styles.profileTop}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{isClient ? "Твоё имя" : (masterName || "Имя мастера")}</Text><Text style={styles.small}>Фото мастера добавляется им самостоятельно.</Text></View></View>
           <Text style={styles.label}>Имя</Text><TextInput placeholder="Как к тебе обращаться" style={styles.input} />
-          <Text style={styles.label}>Город</Text><TextInput value={city} onChangeText={setCity} placeholder="Город" style={styles.input} />
+          {isClient ? <><Text style={styles.label}>Мой город</Text><TextInput value={city} onChangeText={setCity} placeholder="Город" style={styles.input} /><Text style={styles.small}>Смена города обновляет каталог мастеров.</Text></> : <><TouchableOpacity onPress={pickMasterPhoto} style={styles.profileTop}>{masterPhoto ? <Image source={{uri:masterPhoto}} style={styles.profileImage} /> : <PhotoPlaceholder />}<Text style={styles.small}>Нажми, чтобы загрузить своё фото</Text></TouchableOpacity><Text style={styles.label}>Имя мастера</Text><TextInput value={masterName} onChangeText={setMasterName} placeholder="Имя" style={styles.input} /><Text style={styles.label}>Город приёма</Text><TextInput value={masterCity} onChangeText={setMasterCity} placeholder="Город" style={styles.input} /><Text style={styles.label}>О себе</Text><TextInput value={masterBio} onChangeText={setMasterBio} multiline placeholder="Опыт, подход к работе..." style={[styles.input,styles.multiline]} />
           {isClient ? <Text style={styles.small}>Здесь появятся сохранённые мастера и твои записи.</Text> : <>
-            <Text style={styles.label}>О себе и услугах</Text><TextInput multiline placeholder="Расскажи о своём опыте, услугах, материалах и условиях записи..." style={[styles.input, styles.multiline]} />
+            <Text style={styles.label}>Услуги</Text><TextInput multiline placeholder="Перечисли услуги" style={[styles.input, styles.multiline]} />
             <Text style={styles.label}>Условия посещения</Text><TextInput multiline placeholder="Например: можно ли с детьми, есть ли животные, курение, парковка и другие важные детали." style={[styles.input, styles.multiline]} />
-            <SectionTitle title="Отзывы клиентов" /><View style={styles.review}><Text style={styles.stars}>★★★★★</Text><Text style={styles.small}>Здесь будут реальные отзывы после посещения и средняя оценка мастера.</Text></View>
+            <SectionTitle title="Условия посещения" /><TextInput multiline placeholder="Например: можно ли с детьми, есть ли парковка и другие условия..." style={[styles.input,styles.multiline]} /><SectionTitle title="Мой прайс · редактируй цены" />{prices.map(p => <View key={p.id} style={styles.priceEdit}><TextInput value={p.title} onChangeText={v=>setPrices(old=>old.map(x=>x.id===p.id?{...x,title:v}:x))} style={[styles.input,styles.priceName]} placeholder="Услуга" /><TextInput value={p.amount} onChangeText={v=>setPrices(old=>old.map(x=>x.id===p.id?{...x,amount:v}:x))} style={[styles.input,styles.priceAmount]} placeholder="Цена" keyboardType="decimal-pad" /><TouchableOpacity onPress={()=>setPrices(old=>old.filter(x=>x.id!==p.id))}><Text style={styles.remove}>×</Text></TouchableOpacity></View>)}<Button title="＋ Добавить услугу" secondary onPress={()=>setPrices(old=>[...old,{id:Date.now(),title:"",amount:""}])} /><Text style={styles.small}>Пока изменения хранятся только в текущем сеансе. Для публикации прайса всем клиентам подключим базу данных.</Text></>
           </>}
           <Button title="Сохранить профиль" onPress={() => {}} />
         </>}
       </ScrollView>
       <View style={styles.nav}>
-        {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["profile","Профиль"]] : [["home","Главная"],["designs","Идеи"],["masters","Клиенты"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
+        {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["profile","Профиль"]] : [["home","Главная"],["blog","Мой блог"],["designs","Идеи"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
     </SafeAreaView>
   );
@@ -131,5 +170,6 @@ const styles = StyleSheet.create({
   designCard: { backgroundColor: "#FFF", borderRadius: 15, overflow: "hidden", marginBottom: 14, borderWidth: 1, borderColor: "#EFE7E8" }, designVisual: { height: 138, justifyContent: "center", alignItems: "center" }, visualDark: { backgroundColor: "#3C1725" }, visualLight: { backgroundColor: "#EADBDD" }, visualMark: { color: "#C99AA8", fontSize: 58 }, visualLabel: { color: "#D9B8C1", letterSpacing: 3, fontSize: 8, marginTop: 2 }, designInfo: { padding: 14 }, tag: { color: burgundy, fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase" }, cardTitle: { color: ink, fontSize: 15, fontWeight: "700", marginTop: 4 }, small: { color: muted, fontSize: 11, lineHeight: 17, marginTop: 4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 16 }, chip: { borderWidth: 1, borderColor: "#E5D8DB", borderRadius: 20, paddingHorizontal: 13, paddingVertical: 8 }, chipActive: { backgroundColor: burgundy, borderColor: burgundy }, chipText: { color: muted, fontSize: 11 }, chipTextActive: { color: "#FFF" },
   masterCard: { backgroundColor: "#FFF", borderRadius: 15, borderWidth: 1, borderColor: "#EFE7E8", padding: 14, marginTop: 12 }, masterRow: { flexDirection: "row", gap: 13, alignItems: "center", marginBottom: 12 }, photo: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E7DDE0", alignItems: "center", justifyContent: "center" }, photoPlus: { color: burgundy, fontSize: 25 }, photoHint: { color: muted, fontSize: 8 }, stars: { color: "#A66B36", fontWeight: "800", marginTop: 5, fontSize: 12 }, reviewText: { color: "#665B60", fontSize: 12, fontStyle: "italic", marginTop: 10 },
+  profileImage: { width: 76, height: 76, borderRadius: 38 }, postCard: { backgroundColor: "#FFF", borderRadius: 14, padding: 12, marginTop: 14 }, postImage: { width: "100%", height: 230, borderRadius: 10 }, priceLine: { color: ink, fontSize: 13, paddingVertical: 8 }, priceEdit: { flexDirection: "row", alignItems: "center", gap: 6 }, priceName: { flex: 1 }, priceAmount: { width: 90 }, remove: { color: burgundy, fontSize: 25, paddingHorizontal: 5 },
   masterIntro: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#F0E7E8", padding: 14, borderRadius: 15, marginVertical: 12 }, step: { flexDirection: "row", alignItems: "center", paddingVertical: 13, borderBottomWidth: 1, borderColor: "#EEE7E7" }, stepNo: { color: burgundy, fontWeight: "800", marginRight: 14 }, stepText: { color: ink, fontSize: 13 }, profileTop: { flexDirection: "row", gap: 14, alignItems: "center", marginVertical: 20 }, review: { backgroundColor: "#FFF", borderRadius: 12, padding: 14 }, nav: { height: 65, borderTopWidth: 1, borderColor: "#EEE7E7", backgroundColor: "#FFF", flexDirection: "row", justifyContent: "space-around", alignItems: "center" }, navItem: { alignItems: "center", justifyContent: "center", flex: 1 }, navText: { color: muted, fontSize: 10 }, navTextActive: { color: burgundy, fontWeight: "800" }, navDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "transparent", marginTop: 5 }, navDotActive: { backgroundColor: burgundy }
 });
