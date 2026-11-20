@@ -46,6 +46,7 @@ export default function App() {
   const [city, setCity] = useState("Екатеринбург");
   const [masterCity, setMasterCity] = useState("Екатеринбург");
   const [masterName, setMasterName] = useState("");
+  const [profileName, setProfileName] = useState("");
   const [masterBio, setMasterBio] = useState("");
   const [masterPhoto, setMasterPhoto] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -64,15 +65,22 @@ export default function App() {
       if (!alive) return;
       if (data.session) {
         setSignedIn(true);
-        const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", data.session.user.id).maybeSingle();
+        const { data: profile } = await supabase.from("profiles").select("role, full_name").eq("user_id", data.session.user.id).maybeSingle();
         if (alive && (profile?.role === "client" || profile?.role === "master")) setRole(profile.role);
+        if (alive && profile?.full_name) { setProfileName(profile.full_name); setMasterName(profile.full_name); }
       }
       if (alive) setAuthReady(true);
     };
     void restore();
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event !== "PASSWORD_RECOVERY") setSignedIn(!!session);
-      if (!session) setRole(null);
+      if (!session) { setRole(null); setProfileName(""); }
+      else if (event === "SIGNED_IN") {
+        void supabase.from("profiles").select("role, full_name").eq("user_id", session.user.id).maybeSingle().then(({ data: profile }) => {
+          if (profile?.full_name) { setProfileName(profile.full_name); setMasterName(profile.full_name); }
+          if (profile?.role === "client" || profile?.role === "master") setRole(profile.role);
+        });
+      }
     });
     return () => { alive = false; listener.subscription.unsubscribe(); };
   }, []);
@@ -80,15 +88,32 @@ export default function App() {
   const chooseRole = async (nextRole: Role) => {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) return;
-    const fullName = String(auth.user.user_metadata?.full_name || auth.user.email?.split("@")[0] || "Пользователь");
+    const fullName = String(profileName.trim() || auth.user.user_metadata?.full_name || auth.user.email?.split("@")[0] || "Пользователь");
     const { error } = await supabase.from("profiles").upsert({ user_id: auth.user.id, role: nextRole, full_name: fullName }, { onConflict: "user_id" });
     if (error) { Alert.alert("Не удалось сохранить профиль", error.message); return; }
     if (nextRole === "master") {
       const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: fullName }, { onConflict: "user_id" });
       if (masterError) { Alert.alert("Не удалось создать профиль мастера", masterError.message); return; }
     }
+    setProfileName(fullName);
+    setMasterName(fullName);
     setRole(nextRole);
     setTab("home");
+  };
+
+  const saveProfile = async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    if (!profileName.trim()) { Alert.alert("Укажи настоящее имя", "Имя будет отображаться в профиле и в верхней панели."); return; }
+    const { error } = await supabase.from("profiles").upsert({ user_id: auth.user.id, role, full_name: profileName.trim() }, { onConflict: "user_id" });
+    if (error) { Alert.alert("Не удалось сохранить профиль", error.message); return; }
+    await supabase.auth.updateUser({ data: { full_name: profileName.trim() } });
+    if (role === "master") {
+      const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: profileName.trim() }, { onConflict: "user_id" });
+      if (masterError) { Alert.alert("Имя сохранено, но профиль мастера не обновлён", masterError.message); return; }
+    }
+    setMasterName(profileName.trim());
+    Alert.alert("Сохранено", "Имя обновлено и будет показываться сверху в приложении.");
   };
 
   const signOut = async () => {
@@ -137,7 +162,7 @@ export default function App() {
   const title = isClient ? "Найди свой стиль" : "Твоя студия начинается здесь";
   return (
     <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
-      <View style={styles.topbar}><TouchableOpacity onPress={() => setRole(null)}><Text style={styles.back}>‹ Роль</Text></TouchableOpacity><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View>
+      <View style={styles.topbar}><TouchableOpacity onPress={() => setRole(null)}><Text style={styles.back}>‹ Роль</Text></TouchableOpacity><View style={{ alignItems: "center" }}><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.headerName}>{profileName || masterName || "Ваш профиль"}</Text></View><TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View>
       <ScrollView contentContainerStyle={styles.content}>
         {tab === "home" && <>
           <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
@@ -179,15 +204,15 @@ export default function App() {
         </>}
         {tab === "profile" && <>
           <Text style={styles.kicker}>YOUR HIME PROFILE</Text><Text style={styles.pageTitle}>{isClient ? "Мой профиль" : "Профиль мастера"}</Text>
-          <View style={styles.profileTop}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{isClient ? "Твоё имя" : (masterName || "Имя мастера")}</Text><Text style={styles.small}>Фото мастера добавляется им самостоятельно.</Text></View></View>
-          <Text style={styles.label}>Имя</Text><TextInput placeholder="Как к тебе обращаться" style={styles.input} />
+          <View style={styles.profileTop}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{profileName || "Твоё имя"}</Text><Text style={styles.small}>Это имя видно в верхней панели приложения.</Text></View></View>
+          <Text style={styles.label}>Настоящее имя и фамилия</Text><TextInput value={profileName} onChangeText={setProfileName} placeholder="Как к тебе обращаться" style={styles.input} />
           {isClient ? <><Text style={styles.label}>Мой город</Text><TextInput value={city} onChangeText={setCity} placeholder="Город" style={styles.input} /><Text style={styles.small}>Смена города обновляет каталог мастеров.</Text></> : <><TouchableOpacity onPress={pickMasterPhoto} style={styles.profileTop}>{masterPhoto ? <Image source={{uri:masterPhoto}} style={styles.profileImage} /> : <PhotoPlaceholder />}<Text style={styles.small}>Нажми, чтобы загрузить своё фото</Text></TouchableOpacity><Text style={styles.label}>Имя мастера</Text><TextInput value={masterName} onChangeText={setMasterName} placeholder="Имя" style={styles.input} /><Text style={styles.label}>Город приёма</Text><TextInput value={masterCity} onChangeText={setMasterCity} placeholder="Город" style={styles.input} /><Text style={styles.label}>О себе</Text><TextInput value={masterBio} onChangeText={setMasterBio} multiline placeholder="Опыт, подход к работе..." style={[styles.input,styles.multiline]} />
           {isClient ? <Text style={styles.small}>Здесь появятся сохранённые мастера и твои записи.</Text> : <>
             <Text style={styles.label}>Услуги</Text><TextInput multiline placeholder="Перечисли услуги" style={[styles.input, styles.multiline]} />
             <Text style={styles.label}>Условия посещения</Text><TextInput multiline placeholder="Например: можно ли с детьми, есть ли животные, курение, парковка и другие важные детали." style={[styles.input, styles.multiline]} />
             <SectionTitle title="Условия посещения" /><TextInput multiline placeholder="Например: можно ли с детьми, есть ли парковка и другие условия..." style={[styles.input,styles.multiline]} /><SectionTitle title="Мой прайс · редактируй цены" />{prices.map(p => <View key={p.id} style={styles.priceEdit}><TextInput value={p.title} onChangeText={v=>setPrices(old=>old.map(x=>x.id===p.id?{...x,title:v}:x))} style={[styles.input,styles.priceName]} placeholder="Услуга" /><TextInput value={p.amount} onChangeText={v=>setPrices(old=>old.map(x=>x.id===p.id?{...x,amount:v}:x))} style={[styles.input,styles.priceAmount]} placeholder="Цена" keyboardType="decimal-pad" /><TouchableOpacity onPress={()=>setPrices(old=>old.filter(x=>x.id!==p.id))}><Text style={styles.remove}>×</Text></TouchableOpacity></View>)}<Button title="＋ Добавить услугу" secondary onPress={()=>setPrices(old=>[...old,{id:Date.now(),title:"",amount:""}])} /><Text style={styles.small}>Пока изменения хранятся только в текущем сеансе. Для публикации прайса всем клиентам подключим базу данных.</Text></>
           </>}
-          <Button title="Сохранить профиль" onPress={() => {}} />
+          <Button title="Сохранить профиль" onPress={() => { void saveProfile(); }} />
         </>}
       </ScrollView>
       <View style={styles.nav}>
@@ -211,7 +236,7 @@ const styles = StyleSheet.create({
   heroArt: { height: 170, marginTop: 28, marginBottom: 26, borderRadius: 18, backgroundColor: "#EDE2E3", alignItems: "center", justifyContent: "center" }, heroFlower: { color: burgundy, fontSize: 82 }, heroCaption: { color: burgundy, fontSize: 9, letterSpacing: 3, fontWeight: "700" },
   welcomeTitle: { color: ink, fontSize: 32, lineHeight: 39, fontWeight: "700" }, pageTitle: { color: ink, fontSize: 30, lineHeight: 36, fontWeight: "700" }, body: { color: muted, fontSize: 14, lineHeight: 21, marginTop: 10, marginBottom: 18 },
   button: { backgroundColor: burgundy, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 10 }, buttonSecondary: { backgroundColor: "#F0E7E8", borderWidth: 1, borderColor: "#E5D4D8" }, buttonText: { color: "#FFF", fontSize: 14, fontWeight: "700" }, buttonTextSecondary: { color: burgundy },
-  footnote: { color: muted, fontSize: 11, textAlign: "center", marginTop: 18 }, topbar: { height: 54, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderColor: "#EEE7E7" }, back: { color: burgundy, fontWeight: "700" }, roleTag: { color: muted, fontSize: 9, letterSpacing: 2 },
+  footnote: { color: muted, fontSize: 11, textAlign: "center", marginTop: 18 }, topbar: { height: 64, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderColor: "#EEE7E7" }, headerName: { color: muted, fontSize: 10, marginTop: 3, maxWidth: 190 }, back: { color: burgundy, fontWeight: "700" }, roleTag: { color: muted, fontSize: 9, letterSpacing: 2 },
   content: { padding: 20, paddingBottom: 35 }, sectionHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 22, marginBottom: 12 }, sectionTitle: { color: ink, fontSize: 18, fontWeight: "700" }, action: { color: burgundy, fontSize: 11, fontWeight: "700" },
   input: { backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E9DFE1", borderRadius: 11, paddingHorizontal: 14, paddingVertical: 13, color: ink, marginBottom: 10, fontSize: 14 }, label: { color: ink, fontWeight: "700", marginTop: 12, marginBottom: 7, fontSize: 12 }, multiline: { minHeight: 90, textAlignVertical: "top" },
   designCard: { backgroundColor: "#FFF", borderRadius: 15, overflow: "hidden", marginBottom: 14, borderWidth: 1, borderColor: "#EFE7E8" }, designVisual: { height: 138, justifyContent: "center", alignItems: "center" }, visualDark: { backgroundColor: "#3C1725" }, visualLight: { backgroundColor: "#EADBDD" }, visualMark: { color: "#C99AA8", fontSize: 58 }, visualLabel: { color: "#D9B8C1", letterSpacing: 3, fontSize: 8, marginTop: 2 }, designInfo: { padding: 14 }, tag: { color: burgundy, fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase" }, cardTitle: { color: ink, fontSize: 15, fontWeight: "700", marginTop: 4 }, small: { color: muted, fontSize: 11, lineHeight: 17, marginTop: 4 },
