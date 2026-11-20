@@ -154,7 +154,7 @@ export default function App() {
         <Text style={styles.body}>Пространство для тех, кто создаёт красоту и выбирает её.</Text>
         <Button title="Я клиент" onPress={() => { void chooseRole("client"); }} />
         <Button title="Я мастер" secondary onPress={() => { void chooseRole("master"); }} />
-        <Text style={styles.footnote}>Выбери роль. Переключиться можно в любой момент.</Text>
+        <Text style={styles.footnote}>Выбери роль один раз. Изменить её позже можно в настройках профиля.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -163,7 +163,7 @@ export default function App() {
   const title = isClient ? "Найди свой стиль" : "Твоя студия начинается здесь";
   return (
     <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
-      <View style={styles.topbar}><TouchableOpacity onPress={() => setRole(null)}><Text style={styles.back}>‹ Роль</Text></TouchableOpacity><View style={{ alignItems: "center" }}><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.headerName}>{profileName || masterName || "Ваш профиль"}</Text></View><TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View>
+      <View style={styles.topbar}><TouchableOpacity onPress={() => setTab("home")}><Text style={styles.back}>‹ Главная</Text></TouchableOpacity><View style={{ alignItems: "center" }}><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.headerName}>{profileName || masterName || "Ваш профиль"}</Text></View><TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View>
       <ScrollView contentContainerStyle={styles.content}>
         {tab === "home" && <>
           <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
