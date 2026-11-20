@@ -9,9 +9,14 @@
       "**/*"
     ],
     "scheme": "himestudio",
+    "icon": "./assets/hime-icon.png",
     "android": {
       "package": "com.himestudio.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/hime-icon.png",
+        "backgroundColor": "#FAF4F4"
+      }
     }
   }
 }
