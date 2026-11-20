@@ -200,6 +200,20 @@ export default function App() {
     else { setRole(null); setSignedIn(false); }
   };
 
+  useEffect(() => {
+    let active = true;
+    const loadPortfolio = async () => {
+      if (role !== "master") return;
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data, error } = await supabase.from("portfolio_items").select("id,media_path,media_type,caption").eq("master_id", auth.user.id).order("created_at", { ascending: false });
+      if (error || !active) return;
+      setPosts((data || []).map(item => ({ id:item.id, uri:supabase.storage.from("hime-portfolio").getPublicUrl(item.media_path).data.publicUrl, kind:item.media_type, caption:item.caption || "" })));
+    };
+    void loadPortfolio();
+    return () => { active = false; };
+  }, [role]);
+
   if (!authReady) return <SafeAreaView style={styles.safe}><View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}><Text style={styles.brand}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.small}>Восстанавливаем вход...</Text></View></SafeAreaView>;
   if (!signedIn) return <AuthScreen />;
 
@@ -225,20 +239,6 @@ export default function App() {
       setPostCaption("");
     }
   };
-  useEffect(() => {
-    let active = true;
-    const loadPortfolio = async () => {
-      if (role !== "master") return;
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) return;
-      const { data, error } = await supabase.from("portfolio_items").select("id,media_path,media_type,caption").eq("master_id", auth.user.id).order("created_at", { ascending: false });
-      if (error || !active) return;
-      setPosts((data || []).map(item => ({ id:item.id, uri:supabase.storage.from("hime-portfolio").getPublicUrl(item.media_path).data.publicUrl, kind:item.media_type, caption:item.caption || "" })));
-    };
-    void loadPortfolio();
-    return () => { active = false; };
-  }, [role]);
-
   const pickMasterPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { Alert.alert("Нужен доступ к галерее", "Разреши доступ, чтобы выбрать фото профиля."); return; }
