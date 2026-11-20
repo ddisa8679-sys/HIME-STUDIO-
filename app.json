@@ -8,6 +8,10 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "scheme": "himestudio"
+    "scheme": "himestudio",
+    "android": {
+      "package": "com.himestudio.app",
+      "versionCode": 1
+    }
   }
 }
