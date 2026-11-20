@@ -1,0 +1,135 @@
+import React, { useMemo, useState } from "react";
+import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+
+type Role = "client" | "master";
+type Tab = "home" | "designs" | "masters" | "profile";
+
+const burgundy = "#651D32";
+const ink = "#171316";
+const muted = "#8D8186";
+const paper = "#FAF7F6";
+
+const designs = [
+  { title: "Бордовый глянец", detail: "Миндалевидная форма · средняя длина", tag: "Классика", mark: "✦" },
+  { title: "Нежный нюд", detail: "Квадрат · короткая длина", tag: "Минимализм", mark: "♡" },
+  { title: "Вишнёвый акцент", detail: "Овал · длинная длина", tag: "Тренд", mark: "✧" },
+  { title: "Молочный френч", detail: "Мягкий квадрат · средняя длина", tag: "Френч", mark: "❀" },
+];
+
+const masters = [
+  { name: "Имя мастера", city: "Екатеринбург", rating: "5.0", reviews: "18 отзывов", work: "Маникюр · Наращивание · Дизайн" },
+  { name: "Имя мастера", city: "Москва", rating: "4.9", reviews: "32 отзыва", work: "Маникюр · Укрепление · Френч" },
+  { name: "Имя мастера", city: "Казань", rating: "4.8", reviews: "11 отзывов", work: "Маникюр · Педикюр · Дизайн" },
+];
+
+function Button({ title, onPress, secondary = false }: { title: string; onPress: () => void; secondary?: boolean }) {
+  return <TouchableOpacity onPress={onPress} style={[styles.button, secondary && styles.buttonSecondary]}><Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{title}</Text></TouchableOpacity>;
+}
+function SectionTitle({ title, action }: { title: string; action?: string }) {
+  return <View style={styles.sectionHead}><Text style={styles.sectionTitle}>{title}</Text>{action ? <Text style={styles.action}>{action}</Text> : null}</View>;
+}
+function PhotoPlaceholder() {
+  return <View style={styles.photo}><Text style={styles.photoPlus}>＋</Text><Text style={styles.photoHint}>Фото мастера</Text></View>;
+}
+
+export default function App() {
+  const [role, setRole] = useState<Role | null>(null);
+  const [tab, setTab] = useState<Tab>("home");
+  const [city, setCity] = useState("Екатеринбург");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState("Все");
+  const [saved, setSaved] = useState<string[]>([]);
+  const filteredMasters = useMemo(() => masters.filter(m => m.city.toLowerCase().includes(query.toLowerCase()) || m.name.toLowerCase().includes(query.toLowerCase())), [query]);
+  const toggleSaved = (name: string) => setSaved(old => old.includes(name) ? old.filter(x => x !== name) : [...old, name]);
+
+  if (!role) return (
+    <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
+      <ScrollView contentContainerStyle={styles.welcome}>
+        <Text style={styles.brand}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text>
+        <Text style={styles.kicker}>BEAUTY · NAIL COMMUNITY</Text>
+        <View style={styles.heroArt}><Text style={styles.heroFlower}>✿</Text><Text style={styles.heroCaption}>ТВОЙ СТИЛЬ. ТВОИ ПРАВИЛА.</Text></View>
+        <Text style={styles.welcomeTitle}>Добро пожаловать{ "\n" }в HIME STUDIO</Text>
+        <Text style={styles.body}>Пространство для тех, кто создаёт красоту и выбирает её.</Text>
+        <Button title="Я клиент" onPress={() => { setRole("client"); setTab("home"); }} />
+        <Button title="Я мастер" secondary onPress={() => { setRole("master"); setTab("home"); }} />
+        <Text style={styles.footnote}>Выбери роль. Переключиться можно в любой момент.</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+
+  const isClient = role === "client";
+  const title = isClient ? "Найди свой стиль" : "Твоя студия начинается здесь";
+  return (
+    <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
+      <View style={styles.topbar}><TouchableOpacity onPress={() => setRole(null)}><Text style={styles.back}>‹ Роль</Text></TouchableOpacity><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.roleTag}>{isClient ? "КЛИЕНТ" : "МАСТЕР"}</Text></View>
+      <ScrollView contentContainerStyle={styles.content}>
+        {tab === "home" && <>
+          <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
+          <Text style={styles.body}>{isClient ? "Вдохновляйся дизайнами, находи мастеров рядом и выбирай то, что нравится именно тебе." : "Покажи свои работы, расскажи о себе и находи клиентов в своём городе."}</Text>
+          {isClient ? <>
+            <SectionTitle title="Город" /><TextInput value={city} onChangeText={setCity} placeholder="Укажи свой город" style={styles.input} />
+            <SectionTitle title="Популярные дизайны" action="Все дизайны" />
+            {designs.slice(0, 2).map((d, i) => <DesignCard key={d.title} item={d} index={i} />)}
+            <SectionTitle title="Мастера рядом" action="Все мастера" />
+            {masters.filter(m => m.city.toLowerCase() === city.toLowerCase()).slice(0, 1).map((m, i) => <MasterCard key={i} item={m} onPress={() => setTab("masters")} />)}
+            <Button title="Открыть каталог мастеров" onPress={() => setTab("masters")} />
+          </> : <>
+            <View style={styles.masterIntro}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Твоя страница мастера</Text><Text style={styles.small}>Добавь фото, город и описание, чтобы клиенты могли тебя найти.</Text></View></View>
+            <SectionTitle title="Быстрый старт" />
+            {["Заполни описание и услуги", "Добавь фотографии своих работ", "Укажи город и свободное время", "Собирай отзывы клиентов"].map((s, i) => <View style={styles.step} key={s}><Text style={styles.stepNo}>0{i + 1}</Text><Text style={styles.stepText}>{s}</Text></View>)}
+            <Button title="Перейти в мой профиль" onPress={() => setTab("profile")} />
+          </>}
+        </>}
+        {tab === "designs" && <>
+          <Text style={styles.kicker}>NAIL INSPIRATION</Text><Text style={styles.pageTitle}>Каталог дизайнов</Text><Text style={styles.body}>Выбирай идею и сохраняй понравившиеся варианты.</Text>
+          <View style={styles.chips}>{["Все", "Нюд", "Френч", "Яркие", "Бордовые"].map(x => <TouchableOpacity key={x} onPress={() => setSelected(x)} style={[styles.chip, selected === x && styles.chipActive]}><Text style={[styles.chipText, selected === x && styles.chipTextActive]}>{x}</Text></TouchableOpacity>)}</View>
+          {designs.filter(d => selected === "Все" || (selected === "Бордовые" ? d.title.toLowerCase().includes("борд") || d.title.toLowerCase().includes("виш") : d.title.toLowerCase().includes(selected.toLowerCase()))).map((d, i) => <DesignCard key={d.title} item={d} index={i} />)}
+        </>}
+        {tab === "masters" && <>
+          <Text style={styles.kicker}>FIND YOUR NAIL ARTIST</Text><Text style={styles.pageTitle}>Каталог мастеров</Text><Text style={styles.body}>Поиск по городу. Смотри портфолио, рейтинг и отзывы перед записью.</Text>
+          <TextInput value={query} onChangeText={setQuery} placeholder="Введи город или имя мастера" style={styles.input} />
+          {filteredMasters.map((m, i) => <MasterCard key={i} item={m} onPress={() => toggleSaved(m.name + m.city)} saved={saved.includes(m.name + m.city)} />)}
+          {filteredMasters.length === 0 && <Text style={styles.small}>Пока никого не нашли. Проверь название города.</Text>}
+        </>}
+        {tab === "profile" && <>
+          <Text style={styles.kicker}>YOUR HIME PROFILE</Text><Text style={styles.pageTitle}>{isClient ? "Мой профиль" : "Профиль мастера"}</Text>
+          <View style={styles.profileTop}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{isClient ? "Твоё имя" : "Имя мастера"}</Text><Text style={styles.small}>Фото можно будет добавить в профиле.</Text></View></View>
+          <Text style={styles.label}>Имя</Text><TextInput placeholder="Как к тебе обращаться" style={styles.input} />
+          <Text style={styles.label}>Город</Text><TextInput value={city} onChangeText={setCity} placeholder="Город" style={styles.input} />
+          {isClient ? <Text style={styles.small}>Здесь появятся сохранённые мастера и твои записи.</Text> : <>
+            <Text style={styles.label}>О себе и услугах</Text><TextInput multiline placeholder="Расскажи о своём опыте, услугах, материалах и условиях записи..." style={[styles.input, styles.multiline]} />
+            <Text style={styles.label}>Условия посещения</Text><TextInput multiline placeholder="Например: можно ли с детьми, есть ли животные, курение, парковка и другие важные детали." style={[styles.input, styles.multiline]} />
+            <SectionTitle title="Отзывы клиентов" /><View style={styles.review}><Text style={styles.stars}>★★★★★</Text><Text style={styles.small}>Здесь будут реальные отзывы после посещения и средняя оценка мастера.</Text></View>
+          </>}
+          <Button title="Сохранить профиль" onPress={() => {}} />
+        </>}
+      </ScrollView>
+      <View style={styles.nav}>
+        {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["profile","Профиль"]] : [["home","Главная"],["designs","Идеи"],["masters","Клиенты"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function DesignCard({ item, index }: { item: typeof designs[number]; index: number }) {
+  return <View style={styles.designCard}><View style={[styles.designVisual, index % 2 === 0 ? styles.visualDark : styles.visualLight]}><Text style={styles.visualMark}>{item.mark}</Text><Text style={styles.visualLabel}>HIME NAIL DESIGN</Text></View><View style={styles.designInfo}><Text style={styles.tag}>{item.tag}</Text><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.small}>{item.detail}</Text></View></View>;
+}
+function MasterCard({ item, onPress, saved = false }: { item: typeof masters[number]; onPress: () => void; saved?: boolean }) {
+  return <View style={styles.masterCard}><View style={styles.masterRow}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.small}>{item.city}</Text><Text style={styles.stars}>★ {item.rating} <Text style={styles.small}>· {item.reviews}</Text></Text></View></View><Text style={styles.small}>{item.work}</Text><Text style={styles.reviewText}>«Очень аккуратная работа, всё понравилось!»</Text><Button title={saved ? "Сохранено" : "Посмотреть профиль"} secondary onPress={onPress} /></View>;
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: paper }, welcome: { flexGrow: 1, padding: 26, justifyContent: "center" },
+  brand: { fontSize: 24, letterSpacing: 5, fontWeight: "800", color: ink }, brandSmall: { fontSize: 15, letterSpacing: 2, fontWeight: "800", color: ink }, brandAccent: { color: burgundy },
+  kicker: { color: burgundy, letterSpacing: 3, fontSize: 10, fontWeight: "800", marginTop: 24, marginBottom: 10 },
+  heroArt: { height: 170, marginTop: 28, marginBottom: 26, borderRadius: 18, backgroundColor: "#EDE2E3", alignItems: "center", justifyContent: "center" }, heroFlower: { color: burgundy, fontSize: 82 }, heroCaption: { color: burgundy, fontSize: 9, letterSpacing: 3, fontWeight: "700" },
+  welcomeTitle: { color: ink, fontSize: 32, lineHeight: 39, fontWeight: "700" }, pageTitle: { color: ink, fontSize: 30, lineHeight: 36, fontWeight: "700" }, body: { color: muted, fontSize: 14, lineHeight: 21, marginTop: 10, marginBottom: 18 },
+  button: { backgroundColor: burgundy, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 10 }, buttonSecondary: { backgroundColor: "#F0E7E8", borderWidth: 1, borderColor: "#E5D4D8" }, buttonText: { color: "#FFF", fontSize: 14, fontWeight: "700" }, buttonTextSecondary: { color: burgundy },
+  footnote: { color: muted, fontSize: 11, textAlign: "center", marginTop: 18 }, topbar: { height: 54, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderColor: "#EEE7E7" }, back: { color: burgundy, fontWeight: "700" }, roleTag: { color: muted, fontSize: 9, letterSpacing: 2 },
+  content: { padding: 20, paddingBottom: 35 }, sectionHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 22, marginBottom: 12 }, sectionTitle: { color: ink, fontSize: 18, fontWeight: "700" }, action: { color: burgundy, fontSize: 11, fontWeight: "700" },
+  input: { backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E9DFE1", borderRadius: 11, paddingHorizontal: 14, paddingVertical: 13, color: ink, marginBottom: 10, fontSize: 14 }, label: { color: ink, fontWeight: "700", marginTop: 12, marginBottom: 7, fontSize: 12 }, multiline: { minHeight: 90, textAlignVertical: "top" },
+  designCard: { backgroundColor: "#FFF", borderRadius: 15, overflow: "hidden", marginBottom: 14, borderWidth: 1, borderColor: "#EFE7E8" }, designVisual: { height: 138, justifyContent: "center", alignItems: "center" }, visualDark: { backgroundColor: "#3C1725" }, visualLight: { backgroundColor: "#EADBDD" }, visualMark: { color: "#C99AA8", fontSize: 58 }, visualLabel: { color: "#D9B8C1", letterSpacing: 3, fontSize: 8, marginTop: 2 }, designInfo: { padding: 14 }, tag: { color: burgundy, fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase" }, cardTitle: { color: ink, fontSize: 15, fontWeight: "700", marginTop: 4 }, small: { color: muted, fontSize: 11, lineHeight: 17, marginTop: 4 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 16 }, chip: { borderWidth: 1, borderColor: "#E5D8DB", borderRadius: 20, paddingHorizontal: 13, paddingVertical: 8 }, chipActive: { backgroundColor: burgundy, borderColor: burgundy }, chipText: { color: muted, fontSize: 11 }, chipTextActive: { color: "#FFF" },
+  masterCard: { backgroundColor: "#FFF", borderRadius: 15, borderWidth: 1, borderColor: "#EFE7E8", padding: 14, marginTop: 12 }, masterRow: { flexDirection: "row", gap: 13, alignItems: "center", marginBottom: 12 }, photo: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E7DDE0", alignItems: "center", justifyContent: "center" }, photoPlus: { color: burgundy, fontSize: 25 }, photoHint: { color: muted, fontSize: 8 }, stars: { color: "#A66B36", fontWeight: "800", marginTop: 5, fontSize: 12 }, reviewText: { color: "#665B60", fontSize: 12, fontStyle: "italic", marginTop: 10 },
+  masterIntro: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#F0E7E8", padding: 14, borderRadius: 15, marginVertical: 12 }, step: { flexDirection: "row", alignItems: "center", paddingVertical: 13, borderBottomWidth: 1, borderColor: "#EEE7E7" }, stepNo: { color: burgundy, fontWeight: "800", marginRight: 14 }, stepText: { color: ink, fontSize: 13 }, profileTop: { flexDirection: "row", gap: 14, alignItems: "center", marginVertical: 20 }, review: { backgroundColor: "#FFF", borderRadius: 12, padding: 14 }, nav: { height: 65, borderTopWidth: 1, borderColor: "#EEE7E7", backgroundColor: "#FFF", flexDirection: "row", justifyContent: "space-around", alignItems: "center" }, navItem: { alignItems: "center", justifyContent: "center", flex: 1 }, navText: { color: muted, fontSize: 10 }, navTextActive: { color: burgundy, fontWeight: "800" }, navDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "transparent", marginTop: 5 }, navDotActive: { backgroundColor: burgundy }
+});
