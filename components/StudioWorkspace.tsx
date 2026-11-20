@@ -107,7 +107,7 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
   };
 
   const addDayOff = async () => {
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dayOffDate)) return Alert.alert("Неверная дата", "Используй формат ГГГГ-ММ-ДД.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayOffDate)) return Alert.alert("Неверная дата", "Используй формат ГГГГ-ММ-ДД.");
     const { error } = await supabase.from("master_schedule_exceptions").upsert({ master_id: userId, exception_date: dayOffDate, is_day_off: true }, { onConflict: "master_id,exception_date" });
     if (error) Alert.alert("Не удалось сохранить выходной", error.message); else { setDayOffDate(""); Alert.alert("Выходной добавлен", dayOffDate); }
   };
