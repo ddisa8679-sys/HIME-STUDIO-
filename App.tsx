@@ -152,6 +152,9 @@ export default function App() {
     if (nextRole === "master") {
       const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: fullName, is_visible: true }, { onConflict: "user_id" });
       if (masterError) { Alert.alert("Не удалось создать профиль мастера", masterError.message); return; }
+    } else {
+      const { error: hideError } = await supabase.from("master_profiles").update({ is_visible: false }).eq("user_id", auth.user.id);
+      if (hideError) { Alert.alert("Не удалось скрыть профиль мастера", hideError.message); return; }
     }
     setProfileName(fullName);
     setMasterName(fullName);
@@ -181,7 +184,7 @@ export default function App() {
       const { error: masterError } = await supabase.from("master_profiles").upsert(masterPayload, { onConflict: "user_id" });
       if (masterError) { Alert.alert("Имя сохранено, но профиль мастера не обновлён", masterError.message); return; }
       await supabase.from("master_services").delete().eq("master_id", auth.user.id);
-      const serviceRows = prices.filter(p => p.title.trim()).map((p, i) => ({ master_id: auth.user.id, title: p.title.trim(), price: Number(String(p.amount).replace(",", ".").replace(/[^0-9.]/g, "")) || 0, position: i, is_active: true }));
+      const serviceRows = prices.filter(p => p.title.trim()).map((p, i) => ({ master_id: auth.user.id, title: p.title.trim(), price: Number(String(p.amount).replace(",", ".").replace(/[^0-9.]/g, "")) || 0, is_active: true }));
       if (serviceRows.length) {
         const { error: serviceError } = await supabase.from("master_services").insert(serviceRows);
         if (serviceError) { Alert.alert("Профиль сохранён, но прайс не обновился", serviceError.message); return; }
