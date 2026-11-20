@@ -21,6 +21,15 @@ jobs:
         run: npx tsc --noEmit
       - name: Generate Android project
         run: npx expo prebuild --platform android --non-interactive
+      - name: Configure standalone JavaScript bundle
+        run: |
+          set -e
+          test -f android/app/build.gradle
+          if ! grep -q 'debuggableVariants = \[\]' android/app/build.gradle; then
+            sed -i '/^react[[:space:]]*{/a\\    debuggableVariants = []' android/app/build.gradle
+          fi
+          echo "React Native bundling configuration:"
+          grep -n -A3 '^react[[:space:]]*{' android/app/build.gradle
       - name: Align Kotlin with Compose compiler
         run: |
           set -e
@@ -62,8 +71,12 @@ jobs:
       - name: Build installable APK
         working-directory: android
         run: ./gradlew -I /tmp/force-kotlin.init.gradle assembleDebug --no-daemon --refresh-dependencies
-      - name: Verify APK
-        run: test -s android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Verify APK and embedded JavaScript bundle
+        run: |
+          set -e
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -E 'assets/index.android.bundle|assets/.*\.bundle'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
