@@ -48,6 +48,10 @@ export default function App() {
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
   const [citySearch, setCitySearch] = useState("");
   const [masters, setMasters] = useState<Master[]>([]);
+  const [selectedMaster, setSelectedMaster] = useState<Master | null>(null);
+  const [masterReviews, setMasterReviews] = useState<any[]>([]);
+  const [bookingWhen, setBookingWhen] = useState("");
+  const [bookingNote, setBookingNote] = useState("");
   const [masterCity, setMasterCity] = useState("Екатеринбург");
   const [masterName, setMasterName] = useState("");
   const [profileName, setProfileName] = useState("");
@@ -93,6 +97,22 @@ export default function App() {
 
   const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))), [query, city, masters]);
   const toggleSaved = (name: string) => setSaved(old => old.includes(name) ? old.filter(x => x !== name) : [...old, name]);
+  const openMaster = async (master: Master) => {
+    setSelectedMaster(master);
+    setMasterReviews([]);
+    const { data, error } = await supabase.from("reviews").select("id,rating,body,created_at").eq("master_id", master.user_id).order("created_at", { ascending: false });
+    if (!error) setMasterReviews(data || []);
+  };
+  const createBooking = async () => {
+    if (!selectedMaster) return;
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) { Alert.alert("Нужен вход", "Войди в аккаунт, чтобы записаться."); return; }
+    const when = new Date(bookingWhen);
+    if (!bookingWhen.trim() || Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) { Alert.alert("Проверь дату", "Укажи будущую дату и время, например 2026-11-25T15:00:00+03:00."); return; }
+    const { error } = await supabase.from("bookings").insert({ client_id: auth.user.id, master_id: selectedMaster.user_id, starts_at: when.toISOString(), status: "pending", client_note: bookingNote.trim() || null });
+    if (error) Alert.alert("Не удалось отправить заявку", error.message);
+    else { setBookingWhen(""); setBookingNote(""); setSelectedMaster(null); Alert.alert("Заявка отправлена", "Мастер сможет подтвердить или отклонить запись в своём кабинете."); }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -228,7 +248,7 @@ export default function App() {
         {tab === "masters" && <>
           <Text style={styles.kicker}>FIND YOUR NAIL ARTIST</Text><Text style={styles.pageTitle}>Каталог мастеров</Text><Text style={styles.body}>Поиск по городу. Смотри портфолио, рейтинг и отзывы перед записью.</Text>
           <TextInput value={query} onChangeText={setQuery} placeholder="Поиск по имени или услуге" style={styles.input} /><Text style={styles.small}>Город каталога: {city}</Text>
-          {filteredMasters.map((m, i) => <MasterCard key={i} item={m} onPress={() => toggleSaved(m.name + m.city)} saved={saved.includes(m.name + m.city)} />)}
+          {filteredMasters.map((m, i) => <MasterCard key={m.user_id} item={m} onPress={() => { void openMaster(m); }} />)}
           {filteredMasters.length === 0 && <Text style={styles.small}>В выбранном городе пока нет мастеров в демонстрационном списке. Другие города не показываются.</Text>}
         </>}
 
@@ -256,6 +276,7 @@ export default function App() {
       <View style={styles.nav}>
         {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["workspace","Кабинет"],["profile","Профиль"]] : [["home","Главная"],["portfolio","Мои работы"],["workspace","Календарь"],["designs","Идеи"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
+      <Modal visible={!!selectedMaster} animationType="slide" transparent onRequestClose={() => setSelectedMaster(null)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><ScrollView keyboardShouldPersistTaps="handled">{selectedMaster && <><Text style={styles.pageTitle}>{selectedMaster.name}</Text><Text style={styles.small}>{selectedMaster.city}</Text><Text style={styles.stars}>{selectedMaster.rating === "—" ? "Пока без оценок" : "★ "+selectedMaster.rating} · {selectedMaster.reviews}</Text><Text style={styles.sectionTitle}>О мастере</Text><Text style={styles.body}>{selectedMaster.bio || "Мастер пока не добавил описание."}</Text><Text style={styles.sectionTitle}>Услуги</Text><Text style={styles.body}>{selectedMaster.work}</Text><Text style={styles.sectionTitle}>Отзывы клиентов</Text>{masterReviews.length ? masterReviews.map(r => <View key={r.id} style={styles.review}><Text style={styles.stars}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</Text><Text style={styles.small}>{r.body || "Клиент оставил оценку без комментария."}</Text><Text style={styles.small}>{new Date(r.created_at).toLocaleDateString("ru-RU")}</Text></View>) : <Text style={styles.small}>Подтверждённых отзывов пока нет. Здесь будут отображаться только отзывы, привязанные к завершённым записям.</Text>}{role === "client" && <><Text style={styles.sectionTitle}>Записаться к мастеру</Text><TextInput value={bookingWhen} onChangeText={setBookingWhen} placeholder="Дата и время: 2026-11-25T15:00:00+03:00" style={styles.input}/><TextInput value={bookingNote} onChangeText={setBookingNote} placeholder="Комментарий к записи (необязательно)" style={[styles.input,styles.multiline]} multiline/><Button title="Отправить заявку на запись" onPress={() => { void createBooking(); }}/></>}</>}</ScrollView><Button title="Закрыть профиль" secondary onPress={() => setSelectedMaster(null)}/></View></View></Modal>
       <Modal visible={cityPickerVisible} animationType="slide" transparent onRequestClose={() => setCityPickerVisible(false)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><Text style={styles.sectionTitle}>Выбери город</Text><TextInput value={citySearch} onChangeText={setCitySearch} placeholder="Поиск города или региона" style={styles.input} /><ScrollView keyboardShouldPersistTaps="handled">{cities.filter(x => (x.name+" "+(x.region||"")).toLowerCase().includes(citySearch.toLowerCase())).map(x => <TouchableOpacity key={x.id} style={styles.cityOption} onPress={() => { setCity(x.name); setCityId(x.id); setMasterCity(x.name); setCityPickerVisible(false); setCitySearch(""); }}><Text style={styles.cardTitle}>{x.name}</Text><Text style={styles.small}>{x.region || "Россия"}</Text></TouchableOpacity>)}</ScrollView><Button title="Закрыть" secondary onPress={() => setCityPickerVisible(false)} /></View></View></Modal>
     </SafeAreaView>
   );
