@@ -24,12 +24,18 @@ jobs:
       - name: Configure standalone JavaScript bundle
         run: |
           set -e
-          test -f android/app/build.gradle
-          if ! grep -q 'debuggableVariants = \[\]' android/app/build.gradle; then
-            sed -i '/^react[[:space:]]*{/a\\    debuggableVariants = []' android/app/build.gradle
-          fi
-          echo "React Native bundling configuration:"
-          grep -n -A3 '^react[[:space:]]*{' android/app/build.gradle
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/app/build.gradle")
+          text = path.read_text()
+          if "debuggableVariants = []" not in text:
+              if "react {" not in text:
+                  raise SystemExit("React Native react {} block not found in android/app/build.gradle")
+              text = text.replace("react {", "react {\\n    debuggableVariants = []", 1)
+              path.write_text(text)
+          print("Configured React Native to bundle JS for the debug APK.")
+          PY
+          grep -n -A4 '^react[[:space:]]*{' android/app/build.gradle
       - name: Align Kotlin with Compose compiler
         run: |
           set -e
