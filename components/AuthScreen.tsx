@@ -50,9 +50,10 @@ export default function AuthScreen() {
       });
       const type = params.type || hashParams.type;
       const tokenHash = params.token_hash;
-      if (tokenHash && (type === "signup" || type === "email")) {
-        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type === "signup" ? "signup" : "email" });
-        if (error) Alert.alert("Не удалось подтвердить e-mail", error.message);
+      if (tokenHash && (type === "signup" || type === "email" || type === "recovery")) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as "signup" | "email" | "recovery" });
+        if (error) Alert.alert("Не удалось обработать ссылку", error.message);
+        else if (type === "recovery") switchMode("recovery");
         else Alert.alert("E-mail подтверждён", "Теперь можно войти в HIME STUDIO.");
       } else if (type === "recovery" && hashParams.access_token && hashParams.refresh_token) {
         const { error } = await supabase.auth.setSession({ access_token: hashParams.access_token, refresh_token: hashParams.refresh_token });
