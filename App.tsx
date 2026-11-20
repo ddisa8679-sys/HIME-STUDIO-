@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Image, Alert } from "react-native";
+import { Image, Alert, Modal } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import AuthScreen from "./components/AuthScreen";
 import StudioWorkspace from "./components/StudioWorkspace";
@@ -10,6 +10,8 @@ type Role = "client" | "master";
 type Tab = "home" | "designs" | "masters" | "profile" | "portfolio" | "workspace";
 type Post = { id: number; uri: string; kind: string; caption: string };
 type Price = { id: number; title: string; amount: string };
+type City = { id: number; name: string; region: string | null };
+type Master = { user_id: string; name: string; city: string; bio: string; avatar_path: string | null; rating: string; reviews: string; work: string };
 
 const burgundy = "#651D32";
 const ink = "#171316";
@@ -23,11 +25,7 @@ const designs = [
   { title: "Молочный френч", detail: "Мягкий квадрат · средняя длина", tag: "Френч", mark: "❀" },
 ];
 
-const masters = [
-  { name: "Имя мастера", city: "Екатеринбург", rating: "5.0", reviews: "18 отзывов", work: "Маникюр · Наращивание · Дизайн" },
-  { name: "Имя мастера", city: "Москва", rating: "4.9", reviews: "32 отзыва", work: "Маникюр · Укрепление · Френч" },
-  { name: "Имя мастера", city: "Казань", rating: "4.8", reviews: "11 отзывов", work: "Маникюр · Педикюр · Дизайн" },
-];
+const masters: Master[] = [];
 
 function Button({ title, onPress, secondary = false }: { title: string; onPress: () => void; secondary?: boolean }) {
   return <TouchableOpacity onPress={onPress} style={[styles.button, secondary && styles.buttonSecondary]}><Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{title}</Text></TouchableOpacity>;
@@ -44,7 +42,12 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
-  const [city, setCity] = useState("Екатеринбург");
+  const [city, setCity] = useState("Ногинск");
+  const [cityId, setCityId] = useState<number | null>(null);
+  const [cities, setCities] = useState<City[]>([]);
+  const [cityPickerVisible, setCityPickerVisible] = useState(false);
+  const [citySearch, setCitySearch] = useState("");
+  const [masters, setMasters] = useState<Master[]>([]);
   const [masterCity, setMasterCity] = useState("Екатеринбург");
   const [masterName, setMasterName] = useState("");
   const [profileName, setProfileName] = useState("");
@@ -56,7 +59,39 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("Все");
   const [saved, setSaved] = useState<string[]>([]);
-  const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))), [query, city]);
+  useEffect(() => {
+    let active = true;
+    const loadDirectory = async () => {
+      const { data: cityRows } = await supabase.from("cities").select("id,name,region").order("name");
+      if (active) setCities((cityRows || []) as City[]);
+      const { data: masterRows } = await supabase.from("master_profiles").select("user_id,display_name,bio,avatar_path").eq("is_visible", true);
+      if (!masterRows?.length || !active) { if (active) setMasters([]); return; }
+      const ids = masterRows.map(m => m.user_id);
+      const [{ data: profiles }, { data: services }, { data: reviews }] = await Promise.all([
+        supabase.from("profiles").select("user_id,city_id").in("user_id", ids),
+        supabase.from("master_services").select("master_id,title").in("master_id", ids).eq("is_active", true),
+        supabase.from("reviews").select("master_id,rating").in("master_id", ids),
+      ]);
+      const cityIds = [...new Set((profiles || []).map(p => p.city_id).filter(Boolean))];
+      const { data: cityLookup } = cityIds.length ? await supabase.from("cities").select("id,name").in("id", cityIds) : { data: [] as any[] };
+      const cityMap = new Map((cityLookup || []).map(x => [x.id, x.name]));
+      const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
+      const serviceMap = new Map<string,string[]>();
+      (services || []).forEach(s => serviceMap.set(s.master_id,[...(serviceMap.get(s.master_id)||[]),s.title]));
+      const reviewMap = new Map<string,number[]>();
+      (reviews || []).forEach(r => reviewMap.set(r.master_id,[...(reviewMap.get(r.master_id)||[]),r.rating]));
+      const mapped: Master[] = masterRows.map(m => {
+        const ratings = reviewMap.get(m.user_id) || [];
+        return { user_id:m.user_id, name:m.display_name || "Мастер HIME", city:cityMap.get(profileMap.get(m.user_id)?.city_id) || "", bio:m.bio || "", avatar_path:m.avatar_path, rating:ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : "—", reviews:ratings.length ? ratings.length+" отзывов" : "Пока без отзывов", work:(serviceMap.get(m.user_id)||[]).join(" · ") || "Услуги уточняются" };
+      }).filter(m => !!m.city);
+      if (active) setMasters(mapped);
+    };
+    void loadDirectory();
+    return () => { active = false; };
+  }, []);
+
+
+  const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))), [query, city, masters]);
   const toggleSaved = (name: string) => setSaved(old => old.includes(name) ? old.filter(x => x !== name) : [...old, name]);
 
   useEffect(() => {
@@ -66,9 +101,10 @@ export default function App() {
       if (!alive) return;
       if (data.session) {
         setSignedIn(true);
-        const { data: profile } = await supabase.from("profiles").select("role, full_name").eq("user_id", data.session.user.id).maybeSingle();
+        const { data: profile } = await supabase.from("profiles").select("role, full_name, city_id").eq("user_id", data.session.user.id).maybeSingle();
         if (alive && (profile?.role === "client" || profile?.role === "master")) setRole(profile.role);
         if (alive && profile?.full_name) { setProfileName(profile.full_name); setMasterName(profile.full_name); }
+        if (alive && profile?.city_id) setCityId(profile.city_id);
       }
       if (alive) setAuthReady(true);
     };
@@ -77,8 +113,9 @@ export default function App() {
       if (event !== "PASSWORD_RECOVERY") setSignedIn(!!session);
       if (!session) { setRole(null); setProfileName(""); }
       else if (event === "SIGNED_IN") {
-        void supabase.from("profiles").select("role, full_name").eq("user_id", session.user.id).maybeSingle().then(({ data: profile }) => {
+        void supabase.from("profiles").select("role, full_name, city_id").eq("user_id", session.user.id).maybeSingle().then(({ data: profile }) => {
           if (profile?.full_name) { setProfileName(profile.full_name); setMasterName(profile.full_name); }
+          if (profile?.city_id) setCityId(profile.city_id);
           if (profile?.role === "client" || profile?.role === "master") setRole(profile.role);
         });
       }
@@ -90,10 +127,10 @@ export default function App() {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) return;
     const fullName = String(profileName.trim() || auth.user.user_metadata?.full_name || auth.user.email?.split("@")[0] || "Пользователь");
-    const { error } = await supabase.from("profiles").upsert({ user_id: auth.user.id, role: nextRole, full_name: fullName }, { onConflict: "user_id" });
+    const { error } = await supabase.from("profiles").upsert({ user_id: auth.user.id, role: nextRole, full_name: fullName, city_id: cityId }, { onConflict: "user_id" });
     if (error) { Alert.alert("Не удалось сохранить профиль", error.message); return; }
     if (nextRole === "master") {
-      const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: fullName }, { onConflict: "user_id" });
+      const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: fullName, is_visible: true }, { onConflict: "user_id" });
       if (masterError) { Alert.alert("Не удалось создать профиль мастера", masterError.message); return; }
     }
     setProfileName(fullName);
@@ -106,11 +143,11 @@ export default function App() {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) return;
     if (!profileName.trim()) { Alert.alert("Укажи настоящее имя", "Имя будет отображаться в профиле и в верхней панели."); return; }
-    const { error } = await supabase.from("profiles").upsert({ user_id: auth.user.id, role, full_name: profileName.trim() }, { onConflict: "user_id" });
+    const { error } = await supabase.from("profiles").upsert({ user_id: auth.user.id, role, full_name: profileName.trim(), city_id: cityId }, { onConflict: "user_id" });
     if (error) { Alert.alert("Не удалось сохранить профиль", error.message); return; }
     await supabase.auth.updateUser({ data: { full_name: profileName.trim() } });
     if (role === "master") {
-      const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: profileName.trim() }, { onConflict: "user_id" });
+      const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: masterName.trim() || profileName.trim(), bio: masterBio.trim(), is_visible: true }, { onConflict: "user_id" });
       if (masterError) { Alert.alert("Имя сохранено, но профиль мастера не обновлён", masterError.message); return; }
     }
     setMasterName(profileName.trim());
@@ -169,7 +206,7 @@ export default function App() {
           <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
           <Text style={styles.body}>{isClient ? "Вдохновляйся дизайнами, находи мастеров рядом и выбирай то, что нравится именно тебе." : "Покажи свои работы, расскажи о себе и находи клиентов в своём городе."}</Text>
           {isClient ? <>
-            <SectionTitle title="Город" /><TextInput value={city} onChangeText={setCity} placeholder="Укажи свой город" style={styles.input} /><Text style={styles.small}>Показываем только мастеров из выбранного города.</Text>
+            <SectionTitle title="Город" /><TouchableOpacity style={styles.input} onPress={() => setCityPickerVisible(true)}><Text style={{color:city ? ink : muted}}>{city || "Выбери город из списка"}</Text></TouchableOpacity><Text style={styles.small}>Город выбирается из справочника российских городов.</Text>
             <SectionTitle title="Популярные дизайны" action="Все дизайны" />
             {designs.slice(0, 2).map((d, i) => <DesignCard key={d.title} item={d} index={i} />)}
             <SectionTitle title="Мастера рядом" action="Все мастера" />
@@ -208,7 +245,7 @@ export default function App() {
           <Text style={styles.kicker}>YOUR HIME PROFILE</Text><Text style={styles.pageTitle}>{isClient ? "Мой профиль" : "Профиль мастера"}</Text>
           <View style={styles.profileTop}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{profileName || "Твоё имя"}</Text><Text style={styles.small}>Это имя видно в верхней панели приложения.</Text></View></View>
           <Text style={styles.label}>Настоящее имя и фамилия</Text><TextInput value={profileName} onChangeText={setProfileName} placeholder="Как к тебе обращаться" style={styles.input} />
-          {isClient ? <><Text style={styles.label}>Мой город</Text><TextInput value={city} onChangeText={setCity} placeholder="Город" style={styles.input} /><Text style={styles.small}>Смена города обновляет каталог мастеров.</Text></> : <><TouchableOpacity onPress={pickMasterPhoto} style={styles.profileTop}>{masterPhoto ? <Image source={{uri:masterPhoto}} style={styles.profileImage} /> : <PhotoPlaceholder />}<Text style={styles.small}>Нажми, чтобы загрузить своё фото</Text></TouchableOpacity><Text style={styles.label}>Имя мастера</Text><TextInput value={masterName} onChangeText={setMasterName} placeholder="Имя" style={styles.input} /><Text style={styles.label}>Город приёма</Text><TextInput value={masterCity} onChangeText={setMasterCity} placeholder="Город" style={styles.input} /><Text style={styles.label}>О себе</Text><TextInput value={masterBio} onChangeText={setMasterBio} multiline placeholder="Опыт, подход к работе..." style={[styles.input,styles.multiline]} />
+          {isClient ? <><Text style={styles.label}>Мой город</Text><TouchableOpacity style={styles.input} onPress={() => setCityPickerVisible(true)}><Text style={{color:city ? ink : muted}}>{city || "Выбери город из списка"}</Text></TouchableOpacity><Text style={styles.small}>Смена города обновляет каталог мастеров.</Text></> : <><TouchableOpacity onPress={pickMasterPhoto} style={styles.profileTop}>{masterPhoto ? <Image source={{uri:masterPhoto}} style={styles.profileImage} /> : <PhotoPlaceholder />}<Text style={styles.small}>Нажми, чтобы загрузить своё фото</Text></TouchableOpacity><Text style={styles.label}>Имя мастера</Text><TextInput value={masterName} onChangeText={setMasterName} placeholder="Имя" style={styles.input} /><Text style={styles.label}>Город приёма</Text><TouchableOpacity style={styles.input} onPress={() => setCityPickerVisible(true)}><Text style={{color:city ? ink : muted}}>{city || "Выбери город из списка"}</Text></TouchableOpacity><Text style={styles.label}>О себе</Text><TextInput value={masterBio} onChangeText={setMasterBio} multiline placeholder="Опыт, подход к работе..." style={[styles.input,styles.multiline]} />
             <Text style={styles.label}>Услуги</Text><TextInput multiline placeholder="Перечисли услуги" style={[styles.input, styles.multiline]} />
             <Text style={styles.label}>Условия посещения</Text><TextInput multiline placeholder="Например: можно ли с детьми, есть ли животные, курение, парковка и другие важные детали." style={[styles.input, styles.multiline]} />
             <SectionTitle title="Условия посещения" /><TextInput multiline placeholder="Например: можно ли с детьми, есть ли парковка и другие условия..." style={[styles.input,styles.multiline]} /><SectionTitle title="Мой прайс · редактируй цены" />{prices.map(p => <View key={p.id} style={styles.priceEdit}><TextInput value={p.title} onChangeText={v=>setPrices(old=>old.map(x=>x.id===p.id?{...x,title:v}:x))} style={[styles.input,styles.priceName]} placeholder="Услуга" /><TextInput value={p.amount} onChangeText={v=>setPrices(old=>old.map(x=>x.id===p.id?{...x,amount:v}:x))} style={[styles.input,styles.priceAmount]} placeholder="Цена" keyboardType="decimal-pad" /><TouchableOpacity onPress={()=>setPrices(old=>old.filter(x=>x.id!==p.id))}><Text style={styles.remove}>×</Text></TouchableOpacity></View>)}<Button title="＋ Добавить услугу" secondary onPress={()=>setPrices(old=>[...old,{id:Date.now(),title:"",amount:""}])} /><Text style={styles.small}>Пока изменения хранятся только в текущем сеансе. Для публикации прайса всем клиентам подключим базу данных.</Text>
@@ -219,6 +256,7 @@ export default function App() {
       <View style={styles.nav}>
         {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["workspace","Кабинет"],["profile","Профиль"]] : [["home","Главная"],["portfolio","Мои работы"],["workspace","Календарь"],["designs","Идеи"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
+      <Modal visible={cityPickerVisible} animationType="slide" transparent onRequestClose={() => setCityPickerVisible(false)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><Text style={styles.sectionTitle}>Выбери город</Text><TextInput value={citySearch} onChangeText={setCitySearch} placeholder="Поиск города или региона" style={styles.input} /><ScrollView keyboardShouldPersistTaps="handled">{cities.filter(x => (x.name+" "+(x.region||"")).toLowerCase().includes(citySearch.toLowerCase())).map(x => <TouchableOpacity key={x.id} style={styles.cityOption} onPress={() => { setCity(x.name); setCityId(x.id); setMasterCity(x.name); setCityPickerVisible(false); setCitySearch(""); }}><Text style={styles.cardTitle}>{x.name}</Text><Text style={styles.small}>{x.region || "Россия"}</Text></TouchableOpacity>)}</ScrollView><Button title="Закрыть" secondary onPress={() => setCityPickerVisible(false)} /></View></View></Modal>
     </SafeAreaView>
   );
 }
@@ -270,5 +308,5 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 16 }, chip: { borderWidth: 1, borderColor: "#E5D8DB", borderRadius: 20, paddingHorizontal: 13, paddingVertical: 8 }, chipActive: { backgroundColor: burgundy, borderColor: burgundy }, chipText: { color: muted, fontSize: 11 }, chipTextActive: { color: "#FFF" },
   masterCard: { backgroundColor: "#FFF", borderRadius: 15, borderWidth: 1, borderColor: "#EFE7E8", padding: 14, marginTop: 12 }, masterRow: { flexDirection: "row", gap: 13, alignItems: "center", marginBottom: 12 }, photo: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E7DDE0", alignItems: "center", justifyContent: "center" }, photoPlus: { color: burgundy, fontSize: 25 }, photoHint: { color: muted, fontSize: 8 }, stars: { color: "#A66B36", fontWeight: "800", marginTop: 5, fontSize: 12 }, reviewText: { color: "#665B60", fontSize: 12, fontStyle: "italic", marginTop: 10 },
   profileImage: { width: 76, height: 76, borderRadius: 38 }, postCard: { backgroundColor: "#FFF", borderRadius: 14, padding: 12, marginTop: 14 }, postImage: { width: "100%", height: 230, borderRadius: 10 }, videoTile: { width: "100%", height: 230, borderRadius: 10, backgroundColor: "#3C1725", alignItems: "center", justifyContent: "center" }, videoIcon: { color: "#FFF", fontSize: 38 }, videoLabel: { color: "#EADBDD", letterSpacing: 2, fontSize: 10, marginTop: 8 }, deletePost: { alignSelf: "flex-end", paddingVertical: 8 }, priceLine: { color: ink, fontSize: 13, paddingVertical: 8 }, priceEdit: { flexDirection: "row", alignItems: "center", gap: 6 }, priceName: { flex: 1 }, priceAmount: { width: 90 }, remove: { color: burgundy, fontSize: 25, paddingHorizontal: 5 },
-  masterIntro: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#F0E7E8", padding: 14, borderRadius: 15, marginVertical: 12 }, step: { flexDirection: "row", alignItems: "center", paddingVertical: 13, borderBottomWidth: 1, borderColor: "#EEE7E7" }, stepNo: { color: burgundy, fontWeight: "800", marginRight: 14 }, stepText: { color: ink, fontSize: 13 }, profileTop: { flexDirection: "row", gap: 14, alignItems: "center", marginVertical: 20 }, review: { backgroundColor: "#FFF", borderRadius: 12, padding: 14 }, nav: { height: 65, borderTopWidth: 1, borderColor: "#EEE7E7", backgroundColor: "#FFF", flexDirection: "row", justifyContent: "space-around", alignItems: "center" }, navItem: { alignItems: "center", justifyContent: "center", flex: 1 }, navText: { color: muted, fontSize: 10 }, navTextActive: { color: burgundy, fontWeight: "800" }, navDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "transparent", marginTop: 5 }, navDotActive: { backgroundColor: burgundy }
+  masterIntro: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#F0E7E8", padding: 14, borderRadius: 15, marginVertical: 12 }, step: { flexDirection: "row", alignItems: "center", paddingVertical: 13, borderBottomWidth: 1, borderColor: "#EEE7E7" }, stepNo: { color: burgundy, fontWeight: "800", marginRight: 14 }, stepText: { color: ink, fontSize: 13 }, profileTop: { flexDirection: "row", gap: 14, alignItems: "center", marginVertical: 20 }, review: { backgroundColor: "#FFF", borderRadius: 12, padding: 14 }, modalBackdrop: { flex:1, backgroundColor:"rgba(20,10,14,0.45)", justifyContent:"flex-end" }, cityModal: { height:"82%", backgroundColor:paper, borderTopLeftRadius:22, borderTopRightRadius:22, padding:20 }, cityOption: { paddingVertical:12, borderBottomWidth:1, borderColor:"#EEE7E7" }, nav: { height: 65, borderTopWidth: 1, borderColor: "#EEE7E7", backgroundColor: "#FFF", flexDirection: "row", justifyContent: "space-around", alignItems: "center" }, navItem: { alignItems: "center", justifyContent: "center", flex: 1 }, navText: { color: muted, fontSize: 10 }, navTextActive: { color: burgundy, fontWeight: "800" }, navDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "transparent", marginTop: 5 }, navDotActive: { backgroundColor: burgundy }
 });
