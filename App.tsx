@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Image, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import AuthScreen from "./components/AuthScreen";
+import { supabase } from "./lib/supabase";
 import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 type Role = "client" | "master";
@@ -38,6 +40,8 @@ function PhotoPlaceholder() {
 
 export default function App() {
   const [role, setRole] = useState<Role | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
   const [city, setCity] = useState("Екатеринбург");
   const [masterCity, setMasterCity] = useState("Екатеринбург");
@@ -52,6 +56,49 @@ export default function App() {
   const [saved, setSaved] = useState<string[]>([]);
   const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))), [query, city]);
   const toggleSaved = (name: string) => setSaved(old => old.includes(name) ? old.filter(x => x !== name) : [...old, name]);
+
+  useEffect(() => {
+    let alive = true;
+    const restore = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!alive) return;
+      if (data.session) {
+        setSignedIn(true);
+        const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", data.session.user.id).maybeSingle();
+        if (alive && (profile?.role === "client" || profile?.role === "master")) setRole(profile.role);
+      }
+      if (alive) setAuthReady(true);
+    };
+    void restore();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignedIn(!!session);
+      if (!session) setRole(null);
+    });
+    return () => { alive = false; listener.subscription.unsubscribe(); };
+  }, []);
+
+  const chooseRole = async (nextRole: Role) => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    const fullName = String(auth.user.user_metadata?.full_name || auth.user.email?.split("@")[0] || "Пользователь");
+    const { error } = await supabase.from("profiles").upsert({ user_id: auth.user.id, role: nextRole, full_name: fullName }, { onConflict: "user_id" });
+    if (error) { Alert.alert("Не удалось сохранить профиль", error.message); return; }
+    if (nextRole === "master") {
+      const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: fullName }, { onConflict: "user_id" });
+      if (masterError) { Alert.alert("Не удалось создать профиль мастера", masterError.message); return; }
+    }
+    setRole(nextRole);
+    setTab("home");
+  };
+
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) Alert.alert("Не удалось выйти", error.message);
+    else { setRole(null); setSignedIn(false); }
+  };
+
+  if (!authReady) return <SafeAreaView style={styles.safe}><View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}><Text style={styles.brand}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.small}>Восстанавливаем вход...</Text></View></SafeAreaView>;
+  if (!signedIn) return <AuthScreen />;
 
 
   const pickMedia = async () => {
@@ -79,8 +126,8 @@ export default function App() {
         <View style={styles.heroArt}><Text style={styles.heroFlower}>✿</Text><Text style={styles.heroCaption}>ТВОЙ СТИЛЬ. ТВОИ ПРАВИЛА.</Text></View>
         <Text style={styles.welcomeTitle}>Добро пожаловать{ "\n" }в HIME STUDIO</Text>
         <Text style={styles.body}>Пространство для тех, кто создаёт красоту и выбирает её.</Text>
-        <Button title="Я клиент" onPress={() => { setRole("client"); setTab("home"); }} />
-        <Button title="Я мастер" secondary onPress={() => { setRole("master"); setTab("home"); }} />
+        <Button title="Я клиент" onPress={() => { void chooseRole("client"); }} />
+        <Button title="Я мастер" secondary onPress={() => { void chooseRole("master"); }} />
         <Text style={styles.footnote}>Выбери роль. Переключиться можно в любой момент.</Text>
       </ScrollView>
     </SafeAreaView>
@@ -90,7 +137,7 @@ export default function App() {
   const title = isClient ? "Найди свой стиль" : "Твоя студия начинается здесь";
   return (
     <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
-      <View style={styles.topbar}><TouchableOpacity onPress={() => setRole(null)}><Text style={styles.back}>‹ Роль</Text></TouchableOpacity><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.roleTag}>{isClient ? "КЛИЕНТ" : "МАСТЕР"}</Text></View>
+      <View style={styles.topbar}><TouchableOpacity onPress={() => setRole(null)}><Text style={styles.back}>‹ Роль</Text></TouchableOpacity><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View>
       <ScrollView contentContainerStyle={styles.content}>
         {tab === "home" && <>
           <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
