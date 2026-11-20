@@ -19,6 +19,8 @@ jobs:
         run: npm install
       - name: Generate Android project
         run: npx expo prebuild --platform android --non-interactive
+      - name: Align Kotlin with Compose compiler
+        run: sed -i 's/1\\.9\\.24/1.9.25/g' android/build.gradle
       - name: Build installable APK
         working-directory: android
         run: ./gradlew assembleDebug
