@@ -33,9 +33,35 @@ jobs:
           grep -n '^android.kotlinVersion=' android/gradle.properties
           find android node_modules/expo-modules-core -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 | xargs -0 -r sed -i 's/1\.9\.24/1.9.25/g'
           grep -RIn --include='*.gradle' --include='*.gradle.kts' '1\.9\.24\|1\.9\.25' android node_modules/expo-modules-core || true
+      - name: Force Kotlin plugin and compiler version
+        run: |
+          set -e
+          cat > /tmp/force-kotlin.init.gradle <<'EOF'
+          gradle.beforeProject { project ->
+            project.buildscript.configurations.configureEach {
+              resolutionStrategy.eachDependency { details ->
+                if (details.requested.group == "org.jetbrains.kotlin" &&
+                    details.requested.name.startsWith("kotlin-")) {
+                  details.useVersion("1.9.25")
+                  details.because("Compose Compiler 1.5.15 requires Kotlin 1.9.25")
+                }
+              }
+            }
+            project.configurations.configureEach {
+              resolutionStrategy.eachDependency { details ->
+                if (details.requested.group == "org.jetbrains.kotlin" &&
+                    details.requested.name.startsWith("kotlin-")) {
+                  details.useVersion("1.9.25")
+                  details.because("Compose Compiler 1.5.15 requires Kotlin 1.9.25")
+                }
+              }
+            }
+          }
+          EOF
+          echo "Kotlin resolution override prepared"
       - name: Build installable APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew -I /tmp/force-kotlin.init.gradle assembleDebug --no-daemon --refresh-dependencies
       - name: Verify APK
         run: test -s android/app/build/outputs/apk/debug/app-debug.apk
       - name: Upload APK
