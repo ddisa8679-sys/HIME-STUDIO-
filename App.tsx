@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 type Role = "client" | "master";
-type Tab = "home" | "designs" | "masters" | "profile" | "blog";
+type Tab = "home" | "designs" | "masters" | "profile" | "portfolio";
 type Post = { id: number; uri: string; kind: string; caption: string };
 type Price = { id: number; title: string; amount: string };
 
@@ -104,7 +104,7 @@ export default function App() {
             <Button title="Открыть каталог мастеров" onPress={() => setTab("masters")} />
           </> : <>
             <View style={styles.masterIntro}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Твоя страница мастера</Text><Text style={styles.small}>Добавь фото, город и описание, чтобы клиенты могли тебя найти.</Text></View></View>
-            <SectionTitle title="Мой блог" /><Text style={styles.small}>Публикуй фото и видео своих работ.</Text><Button title="Добавить фото или видео" onPress={() => setTab("blog")} /><SectionTitle title="Мой прайс" />{prices.map(p => <Text style={styles.priceLine} key={p.id}>{p.title} · {p.amount} ₽</Text>)}<Button title="Редактировать прайс" secondary onPress={() => setTab("profile")} />
+            <SectionTitle title="Портфолио работ" /><Text style={styles.small}>Добавляй фотографии и видео своих работ в своё портфолио.</Text><Button title="Добавить фото или видео" onPress={() => setTab("portfolio")} /><SectionTitle title="Мой прайс" />{prices.map(p => <Text style={styles.priceLine} key={p.id}>{p.title} · {p.amount} ₽</Text>)}<Button title="Редактировать прайс" secondary onPress={() => setTab("profile")} />
             <SectionTitle title="Быстрый старт" />
             {["Заполни описание и услуги", "Добавь фотографии своих работ", "Укажи город и свободное время", "Собирай отзывы клиентов"].map((s, i) => <View style={styles.step} key={s}><Text style={styles.stepNo}>0{i + 1}</Text><Text style={styles.stepText}>{s}</Text></View>)}
             <Button title="Перейти в мой профиль" onPress={() => setTab("profile")} />
@@ -122,13 +122,13 @@ export default function App() {
           {filteredMasters.length === 0 && <Text style={styles.small}>В выбранном городе пока нет мастеров в демонстрационном списке. Другие города не показываются.</Text>}
         </>}
 
-        {tab === "blog" && <>
-          <Text style={styles.kicker}>MASTER BLOG</Text><Text style={styles.pageTitle}>Мои работы</Text>
-          <Text style={styles.body}>Добавляй фотографии и видео своих работ.</Text>
+        {tab === "portfolio" && <>
+          <Text style={styles.kicker}>MY PORTFOLIO</Text><Text style={styles.pageTitle}>Портфолио работ</Text>
+          <Text style={styles.body}>Загружай фотографии и видео. Это витрина твоих работ, без лайков и комментариев.</Text>
           <TextInput value={postCaption} onChangeText={setPostCaption} placeholder="Подпись к публикации..." style={[styles.input,styles.multiline]} multiline />
           <Button title="Выбрать фото или видео из галереи" onPress={pickMedia} />
           {posts.length === 0 && <Text style={styles.small}>Публикаций пока нет. Добавь первую работу.</Text>}
-          {posts.map(post=><View key={post.id} style={styles.postCard}><Image source={{uri:post.uri}} style={styles.postImage} /><Text style={styles.tag}>{post.kind === "video" ? "ВИДЕО" : "ФОТО"}</Text>{!!post.caption && <Text style={styles.cardTitle}>{post.caption}</Text>}</View>)}
+          {posts.map(post=><View key={post.id} style={styles.postCard}>{post.kind === "video" ? <View style={styles.videoTile}><Text style={styles.videoIcon}>▶</Text><Text style={styles.videoLabel}>ВИДЕО РАБОТА</Text></View> : <Image source={{uri:post.uri}} style={styles.postImage} />}<Text style={styles.tag}>{post.kind === "video" ? "ВИДЕО" : "ФОТО"}</Text>{!!post.caption && <Text style={styles.cardTitle}>{post.caption}</Text>}<TouchableOpacity onPress={()=>setPosts(old=>old.filter(x=>x.id!==post.id))} style={styles.deletePost}><Text style={styles.remove}>Удалить работу</Text></TouchableOpacity></View>)}
         </>}
         {tab === "profile" && <>
           <Text style={styles.kicker}>YOUR HIME PROFILE</Text><Text style={styles.pageTitle}>{isClient ? "Мой профиль" : "Профиль мастера"}</Text>
@@ -144,7 +144,7 @@ export default function App() {
         </>}
       </ScrollView>
       <View style={styles.nav}>
-        {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["profile","Профиль"]] : [["home","Главная"],["blog","Мой блог"],["designs","Идеи"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
+        {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["profile","Профиль"]] : [["home","Главная"],["portfolio","Мои работы"],["designs","Идеи"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
     </SafeAreaView>
   );
@@ -154,7 +154,7 @@ function DesignCard({ item, index }: { item: typeof designs[number]; index: numb
   return <View style={styles.designCard}><View style={[styles.designVisual, index % 2 === 0 ? styles.visualDark : styles.visualLight]}><Text style={styles.visualMark}>{item.mark}</Text><Text style={styles.visualLabel}>HIME NAIL DESIGN</Text></View><View style={styles.designInfo}><Text style={styles.tag}>{item.tag}</Text><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.small}>{item.detail}</Text></View></View>;
 }
 function MasterCard({ item, onPress, saved = false }: { item: typeof masters[number]; onPress: () => void; saved?: boolean }) {
-  return <View style={styles.masterCard}><View style={styles.masterRow}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.small}>{item.city}</Text><Text style={styles.stars}>★ {item.rating} <Text style={styles.small}>· {item.reviews}</Text></Text></View></View><Text style={styles.small}>{item.work}</Text><Text style={styles.reviewText}>«Очень аккуратная работа, всё понравилось!»</Text><Button title={saved ? "Сохранено" : "Посмотреть профиль"} secondary onPress={onPress} /></View>;
+  return <View style={styles.masterCard}><View style={styles.masterRow}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.small}>{item.city}</Text><Text style={styles.stars}>★ {item.rating} <Text style={styles.small}>· {item.reviews}</Text></Text></View></View><Text style={styles.small}>{item.work}</Text><Button title={saved ? "Сохранено" : "Посмотреть профиль"} secondary onPress={onPress} /></View>;
 }
 
 const styles = StyleSheet.create({
@@ -170,6 +170,6 @@ const styles = StyleSheet.create({
   designCard: { backgroundColor: "#FFF", borderRadius: 15, overflow: "hidden", marginBottom: 14, borderWidth: 1, borderColor: "#EFE7E8" }, designVisual: { height: 138, justifyContent: "center", alignItems: "center" }, visualDark: { backgroundColor: "#3C1725" }, visualLight: { backgroundColor: "#EADBDD" }, visualMark: { color: "#C99AA8", fontSize: 58 }, visualLabel: { color: "#D9B8C1", letterSpacing: 3, fontSize: 8, marginTop: 2 }, designInfo: { padding: 14 }, tag: { color: burgundy, fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase" }, cardTitle: { color: ink, fontSize: 15, fontWeight: "700", marginTop: 4 }, small: { color: muted, fontSize: 11, lineHeight: 17, marginTop: 4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 16 }, chip: { borderWidth: 1, borderColor: "#E5D8DB", borderRadius: 20, paddingHorizontal: 13, paddingVertical: 8 }, chipActive: { backgroundColor: burgundy, borderColor: burgundy }, chipText: { color: muted, fontSize: 11 }, chipTextActive: { color: "#FFF" },
   masterCard: { backgroundColor: "#FFF", borderRadius: 15, borderWidth: 1, borderColor: "#EFE7E8", padding: 14, marginTop: 12 }, masterRow: { flexDirection: "row", gap: 13, alignItems: "center", marginBottom: 12 }, photo: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E7DDE0", alignItems: "center", justifyContent: "center" }, photoPlus: { color: burgundy, fontSize: 25 }, photoHint: { color: muted, fontSize: 8 }, stars: { color: "#A66B36", fontWeight: "800", marginTop: 5, fontSize: 12 }, reviewText: { color: "#665B60", fontSize: 12, fontStyle: "italic", marginTop: 10 },
-  profileImage: { width: 76, height: 76, borderRadius: 38 }, postCard: { backgroundColor: "#FFF", borderRadius: 14, padding: 12, marginTop: 14 }, postImage: { width: "100%", height: 230, borderRadius: 10 }, priceLine: { color: ink, fontSize: 13, paddingVertical: 8 }, priceEdit: { flexDirection: "row", alignItems: "center", gap: 6 }, priceName: { flex: 1 }, priceAmount: { width: 90 }, remove: { color: burgundy, fontSize: 25, paddingHorizontal: 5 },
+  profileImage: { width: 76, height: 76, borderRadius: 38 }, postCard: { backgroundColor: "#FFF", borderRadius: 14, padding: 12, marginTop: 14 }, postImage: { width: "100%", height: 230, borderRadius: 10 }, videoTile: { width: "100%", height: 230, borderRadius: 10, backgroundColor: "#3C1725", alignItems: "center", justifyContent: "center" }, videoIcon: { color: "#FFF", fontSize: 38 }, videoLabel: { color: "#EADBDD", letterSpacing: 2, fontSize: 10, marginTop: 8 }, deletePost: { alignSelf: "flex-end", paddingVertical: 8 }, priceLine: { color: ink, fontSize: 13, paddingVertical: 8 }, priceEdit: { flexDirection: "row", alignItems: "center", gap: 6 }, priceName: { flex: 1 }, priceAmount: { width: 90 }, remove: { color: burgundy, fontSize: 25, paddingHorizontal: 5 },
   masterIntro: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#F0E7E8", padding: 14, borderRadius: 15, marginVertical: 12 }, step: { flexDirection: "row", alignItems: "center", paddingVertical: 13, borderBottomWidth: 1, borderColor: "#EEE7E7" }, stepNo: { color: burgundy, fontWeight: "800", marginRight: 14 }, stepText: { color: ink, fontSize: 13 }, profileTop: { flexDirection: "row", gap: 14, alignItems: "center", marginVertical: 20 }, review: { backgroundColor: "#FFF", borderRadius: 12, padding: 14 }, nav: { height: 65, borderTopWidth: 1, borderColor: "#EEE7E7", backgroundColor: "#FFF", flexDirection: "row", justifyContent: "space-around", alignItems: "center" }, navItem: { alignItems: "center", justifyContent: "center", flex: 1 }, navText: { color: muted, fontSize: 10 }, navTextActive: { color: burgundy, fontWeight: "800" }, navDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "transparent", marginTop: 5 }, navDotActive: { backgroundColor: burgundy }
 });
