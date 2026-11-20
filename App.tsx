@@ -70,8 +70,8 @@ export default function App() {
       if (alive) setAuthReady(true);
     };
     void restore();
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSignedIn(!!session);
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== "PASSWORD_RECOVERY") setSignedIn(!!session);
       if (!session) setRole(null);
     });
     return () => { alive = false; listener.subscription.unsubscribe(); };
