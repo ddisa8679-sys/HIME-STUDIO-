@@ -11,25 +11,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - name: Install dependencies
         run: npm install
+      - name: TypeScript validation
+        run: npx tsc --noEmit
       - name: Generate Android project
         run: npx expo prebuild --platform android --non-interactive
       - name: Align Kotlin with Compose compiler
         run: |
           set -e
-          echo "Kotlin version references before patch:"
-          grep -RIn --include='*.gradle' --include='*.gradle.kts' '1\.9\.24' android node_modules/expo-modules-core || true
+          if grep -q '^android.kotlinVersion=' android/gradle.properties; then
+            sed -i 's/^android.kotlinVersion=1.9.24$/android.kotlinVersion=1.9.25/' android/gradle.properties
+          else
+            echo 'android.kotlinVersion=1.9.25' >> android/gradle.properties
+          fi
+          echo "Effective Kotlin version property:"
+          grep -n '^android.kotlinVersion=' android/gradle.properties
           find android node_modules/expo-modules-core -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 | xargs -0 -r sed -i 's/1\.9\.24/1.9.25/g'
-          echo "Kotlin version references after patch:"
           grep -RIn --include='*.gradle' --include='*.gradle.kts' '1\.9\.24\|1\.9\.25' android node_modules/expo-modules-core || true
       - name: Build installable APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Verify APK
+        run: test -s android/app/build/outputs/apk/debug/app-debug.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
