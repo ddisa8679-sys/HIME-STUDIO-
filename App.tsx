@@ -8,7 +8,7 @@ import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, Touch
 
 type Role = "client" | "master";
 type Tab = "home" | "designs" | "masters" | "profile" | "portfolio" | "workspace";
-type Post = { id: number; uri: string; kind: string; caption: string };
+type Post = { id: string | number; uri: string; kind: string; caption: string };
 type Price = { id: number; title: string; amount: string };
 type City = { id: number; name: string; region: string | null };
 type Master = { user_id: string; name: string; city: string; bio: string; avatar_path: string | null; rating: string; reviews: string; work: string };
@@ -167,11 +167,28 @@ export default function App() {
     if (error) { Alert.alert("Не удалось сохранить профиль", error.message); return; }
     await supabase.auth.updateUser({ data: { full_name: profileName.trim() } });
     if (role === "master") {
-      const { error: masterError } = await supabase.from("master_profiles").upsert({ user_id: auth.user.id, display_name: masterName.trim() || profileName.trim(), bio: masterBio.trim(), is_visible: true }, { onConflict: "user_id" });
+      let avatarPath: string | null = null;
+      if (masterPhoto && !masterPhoto.startsWith("http")) {
+        const response = await fetch(masterPhoto);
+        const blob = await response.blob();
+        const path = auth.user.id + "/avatar-" + Date.now() + ".jpg";
+        const { error: uploadError } = await supabase.storage.from("hime-portfolio").upload(path, blob, { contentType: "image/jpeg", upsert: true });
+        if (uploadError) { Alert.alert("Не удалось загрузить фото", uploadError.message); return; }
+        avatarPath = path;
+      }
+      const masterPayload: any = { user_id: auth.user.id, display_name: masterName.trim() || profileName.trim(), bio: masterBio.trim(), is_visible: true };
+      if (avatarPath) masterPayload.avatar_path = avatarPath;
+      const { error: masterError } = await supabase.from("master_profiles").upsert(masterPayload, { onConflict: "user_id" });
       if (masterError) { Alert.alert("Имя сохранено, но профиль мастера не обновлён", masterError.message); return; }
+      await supabase.from("master_services").delete().eq("master_id", auth.user.id);
+      const serviceRows = prices.filter(p => p.title.trim()).map((p, i) => ({ master_id: auth.user.id, title: p.title.trim(), price: Number(String(p.amount).replace(",", ".").replace(/[^0-9.]/g, "")) || 0, position: i, is_active: true }));
+      if (serviceRows.length) {
+        const { error: serviceError } = await supabase.from("master_services").insert(serviceRows);
+        if (serviceError) { Alert.alert("Профиль сохранён, но прайс не обновился", serviceError.message); return; }
+      }
     }
-    setMasterName(profileName.trim());
-    Alert.alert("Сохранено", "Имя обновлено и будет показываться сверху в приложении.");
+    setMasterName(masterName.trim() || profileName.trim());
+    Alert.alert("Сохранено", "Профиль, город и услуги сохранены.");
   };
 
   const signOut = async () => {
@@ -190,10 +207,35 @@ export default function App() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, allowsEditing: false, quality: 0.85 });
     if (!result.canceled && result.assets?.[0]) {
       const asset = result.assets[0];
-      setPosts(old => [{ id: Date.now(), uri: asset.uri, kind: asset.type || "media", caption: postCaption.trim() }, ...old]);
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const extension = asset.mimeType?.split("/")[1] || (asset.type === "video" ? "mp4" : "jpg");
+      const path = auth.user.id + "/portfolio-" + Date.now() + "." + extension;
+      const { error: uploadError } = await supabase.storage.from("hime-portfolio").upload(path, blob, { contentType: asset.mimeType || (asset.type === "video" ? "video/mp4" : "image/jpeg") });
+      if (uploadError) { Alert.alert("Не удалось загрузить работу", uploadError.message); return; }
+      const { data: row, error: insertError } = await supabase.from("portfolio_items").insert({ master_id: auth.user.id, media_path: path, media_type: asset.type === "video" ? "video" : "image", caption: postCaption.trim() }).select("id").single();
+      if (insertError) { Alert.alert("Файл загружен, но публикация не сохранена", insertError.message); return; }
+      const publicUrl = supabase.storage.from("hime-portfolio").getPublicUrl(path).data.publicUrl;
+      setPosts(old => [{ id: row.id, uri: publicUrl, kind: asset.type || "image", caption: postCaption.trim() }, ...old]);
       setPostCaption("");
     }
   };
+  useEffect(() => {
+    let active = true;
+    const loadPortfolio = async () => {
+      if (role !== "master") return;
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data, error } = await supabase.from("portfolio_items").select("id,media_path,media_type,caption").eq("master_id", auth.user.id).order("created_at", { ascending: false });
+      if (error || !active) return;
+      setPosts((data || []).map(item => ({ id:item.id, uri:supabase.storage.from("hime-portfolio").getPublicUrl(item.media_path).data.publicUrl, kind:item.media_type, caption:item.caption || "" })));
+    };
+    void loadPortfolio();
+    return () => { active = false; };
+  }, [role]);
+
   const pickMasterPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { Alert.alert("Нужен доступ к галерее", "Разреши доступ, чтобы выбрать фото профиля."); return; }
