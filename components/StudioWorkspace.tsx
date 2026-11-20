@@ -29,6 +29,9 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
   const [editStart, setEditStart] = useState("10:00");
   const [editEnd, setEditEnd] = useState("19:00");
   const [bookingDate, setBookingDate] = useState("");
+  const [dayOffDate, setDayOffDate] = useState("");
+  const [reviewText, setReviewText] = useState("");
+  const [reviewRating, setReviewRating] = useState("5");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -85,6 +88,30 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
     else void load();
   };
 
+  const rescheduleBooking = async (booking: any) => {
+    if (!bookingDate.trim()) return Alert.alert("Нужна дата", "Введи новую дату и время в формате 2026-11-25T15:00:00+03:00.");
+    const next = new Date(bookingDate);
+    if (Number.isNaN(next.getTime())) return Alert.alert("Неверная дата", "Проверь формат даты и времени.");
+    const oldStart = new Date(booking.starts_at).getTime();
+    const oldEnd = booking.ends_at ? new Date(booking.ends_at).getTime() : oldStart + 60 * 60000;
+    const duration = Math.max(15 * 60000, oldEnd - oldStart);
+    const { error } = await supabase.from("bookings").update({ starts_at: next.toISOString(), ends_at: new Date(next.getTime() + duration).toISOString(), updated_at: new Date().toISOString() }).eq("id", booking.id);
+    if (error) Alert.alert("Не удалось перенести запись", error.message); else { setBookingDate(""); Alert.alert("Запись перенесена", "Новое время сохранено."); void load(); }
+  };
+
+  const submitReview = async (booking: any) => {
+    const score = Number(reviewRating);
+    if (!Number.isInteger(score) || score < 1 || score > 5) return Alert.alert("Оценка от 1 до 5", "Укажи корректную оценку.");
+    const { error } = await supabase.from("reviews").insert({ booking_id: booking.id, client_id: userId, master_id: booking.master_id, rating: score, body: reviewText.trim() || null });
+    if (error) Alert.alert("Не удалось отправить отзыв", error.message); else { setReviewText(""); Alert.alert("Спасибо за отзыв", "Оценка сохранена."); void load(); }
+  };
+
+  const addDayOff = async () => {
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dayOffDate)) return Alert.alert("Неверная дата", "Используй формат ГГГГ-ММ-ДД.");
+    const { error } = await supabase.from("master_schedule_exceptions").upsert({ master_id: userId, exception_date: dayOffDate, is_day_off: true }, { onConflict: "master_id,exception_date" });
+    if (error) Alert.alert("Не удалось сохранить выходной", error.message); else { setDayOffDate(""); Alert.alert("Выходной добавлен", dayOffDate); }
+  };
+
   const markRead = async (id: string) => {
     const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
     if (error) Alert.alert("Ошибка", error.message); else void load();
@@ -109,7 +136,7 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
         <Text style={s.title}>Рабочий календарь</Text><Text style={s.note}>Настрой обычные часы работы по дням недели. Выходные можно отключить отдельно.</Text>
         <Text style={s.label}>Время работы для выбранного дня</Text><View style={s.row}><View style={{flex:1}}><Field value={editStart} onChangeText={setEditStart} placeholder="Начало, 10:00"/></View><View style={{flex:1}}><Field value={editEnd} onChangeText={setEditEnd} placeholder="Конец, 19:00"/></View></View>
         {weekdays.map((day, i) => { const item = rows.find(x => x.weekday === i); return <View key={day} style={s.card}><View style={s.row}><Text style={s.cardTitle}>{day}</Text><Text style={s.note}>{item ? (item.is_working ? item.starts_at?.slice(0,5)+"–"+item.ends_at?.slice(0,5) : "Выходной") : "Не настроено"}</Text></View><View style={s.row}><Action title="Рабочий день" secondary onPress={() => void saveHours(i, true)}/><Action title="Выходной" secondary onPress={() => void saveHours(i, false)}/></View></View>; })}
-        <Text style={s.heading}>Добавить перерыв</Text><Field value={breakDay} onChangeText={setBreakDay} placeholder="День недели: 0–6 (0 — воскресенье)"/><View style={s.row}><View style={{flex:1}}><Field value={breakStart} onChangeText={setBreakStart} placeholder="13:00"/></View><View style={{flex:1}}><Field value={breakEnd} onChangeText={setBreakEnd} placeholder="14:00"/></View></View><Action title="Сохранить перерыв" onPress={() => void addBreak()}/>
+        <Text style={s.heading}>Добавить перерыв</Text><Field value={breakDay} onChangeText={setBreakDay} placeholder="День недели: 0–6 (0 — воскресенье)"/><View style={s.row}><View style={{flex:1}}><Field value={breakStart} onChangeText={setBreakStart} placeholder="13:00"/></View><View style={{flex:1}}><Field value={breakEnd} onChangeText={setBreakEnd} placeholder="14:00"/></View></View><Action title="Сохранить перерыв" onPress={() => void addBreak()}/><Text style={s.heading}>Разовый выходной</Text><Field value={dayOffDate} onChangeText={setDayOffDate} placeholder="Дата: 2026-12-31"/><Action title="Добавить выходной" secondary onPress={() => void addDayOff()}/>
       </>}
       {screen === "tasks" && role === "master" && <>
         <Text style={s.title}>Мои задачи</Text><Field value={taskTitle} onChangeText={setTaskTitle} placeholder="Например, заказать материалы"/><Field value={taskDue} onChangeText={setTaskDue} placeholder="Срок: 2026-11-25T15:00:00"/><Action title="Добавить задачу" onPress={() => void addTask()}/>
@@ -118,7 +145,7 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
       </>}
       {screen === "bookings" && <>
         <Text style={s.title}>{role === "master" ? "Записи клиентов" : "История записей"}</Text><Text style={s.note}>Заявки, подтверждения, переносы и отмены.</Text>
-        {rows.map(b => <View key={b.id} style={s.card}><Text style={s.cardTitle}>{new Date(b.starts_at).toLocaleString()}</Text><Text style={s.note}>Статус: {b.status}</Text>{b.client_note && <Text style={s.note}>{b.client_note}</Text>}{role === "master" && <View style={s.row}><Action title="Подтвердить" secondary onPress={() => void updateBooking(b.id,"confirmed")}/><Action title="Завершить" secondary onPress={() => void updateBooking(b.id,"completed")}/><Action title="Отменить" secondary onPress={() => void updateBooking(b.id,"cancelled")}/></View>}{role === "client" && b.status === "confirmed" && <Action title="Отменить запись" secondary onPress={() => void updateBooking(b.id,"cancelled")}/>}</View>)}
+        {rows.map(b => <View key={b.id} style={s.card}><Text style={s.cardTitle}>{new Date(b.starts_at).toLocaleString()}</Text><Text style={s.note}>Статус: {b.status}</Text>{b.client_note && <Text style={s.note}>{b.client_note}</Text>}{role === "master" && <View style={s.row}><Action title="Подтвердить" secondary onPress={() => void updateBooking(b.id,"confirmed")}/><Action title="Завершить" secondary onPress={() => void updateBooking(b.id,"completed")}/><Action title="Отменить" secondary onPress={() => void updateBooking(b.id,"cancelled")}/></View>}{b.status === "confirmed" && <><Field value={bookingDate} onChangeText={setBookingDate} placeholder="Перенос: 2026-11-25T15:00:00+03:00"/><Action title="Перенести запись" secondary onPress={() => void rescheduleBooking(b)}/></>}{role === "client" && b.status === "confirmed" && <Action title="Отменить запись" secondary onPress={() => void updateBooking(b.id,"cancelled")}/ >}{role === "client" && b.status === "completed" && <><Field value={reviewRating} onChangeText={setReviewRating} placeholder="Оценка 1–5"/><Field value={reviewText} onChangeText={setReviewText} placeholder="Твой отзыв"/><Action title="Оставить отзыв" onPress={() => void submitReview(b)}/></>}</View>)}
         {!rows.length && <Text style={s.note}>Записей пока нет. Они появятся здесь после оформления через каталог мастеров.</Text>}
       </>}
       {screen === "favorites" && role === "client" && <>
