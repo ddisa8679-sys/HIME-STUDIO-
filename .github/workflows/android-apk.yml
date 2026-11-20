@@ -31,10 +31,11 @@ jobs:
           if "debuggableVariants = []" not in text:
               if "react {" not in text:
                   raise SystemExit("React Native react {} block not found in android/app/build.gradle")
-              text = text.replace("react {", "react {\\n    debuggableVariants = []", 1)
+              text = text.replace("react {", "react {" + chr(10) + "    debuggableVariants = []", 1)
               path.write_text(text)
           print("Configured React Native to bundle JS for the debug APK.")
           PY
+          if grep -Fq \\n android/app/build.gradle; then echo "Literal \\n found in Gradle file"; exit 1; fi
           grep -n -A4 '^react[[:space:]]*{' android/app/build.gradle
       - name: Align Kotlin with Compose compiler
         run: |
