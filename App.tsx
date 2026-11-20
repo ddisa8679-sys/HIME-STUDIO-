@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Image, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import AuthScreen from "./components/AuthScreen";
+import StudioWorkspace from "./components/StudioWorkspace";
 import { supabase } from "./lib/supabase";
 import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 type Role = "client" | "master";
-type Tab = "home" | "designs" | "masters" | "profile" | "portfolio";
+type Tab = "home" | "designs" | "masters" | "profile" | "portfolio" | "workspace";
 type Post = { id: number; uri: string; kind: string; caption: string };
 type Price = { id: number; title: string; amount: string };
 
@@ -173,13 +174,13 @@ export default function App() {
             {designs.slice(0, 2).map((d, i) => <DesignCard key={d.title} item={d} index={i} />)}
             <SectionTitle title="Мастера рядом" action="Все мастера" />
             {masters.filter(m => m.city.toLowerCase() === city.toLowerCase()).slice(0, 1).map((m, i) => <MasterCard key={i} item={m} onPress={() => setTab("masters")} />)}
-            <Button title="Открыть каталог мастеров" onPress={() => setTab("masters")} />
+            <Button title="Открыть каталог мастеров" onPress={() => setTab("masters")} /><Button title="Мои записи и избранное" secondary onPress={() => setTab("workspace")} />
           </> : <>
             <View style={styles.masterIntro}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Твоя страница мастера</Text><Text style={styles.small}>Добавь фото, город и описание, чтобы клиенты могли тебя найти.</Text></View></View>
             <SectionTitle title="Портфолио работ" /><Text style={styles.small}>Добавляй фотографии и видео своих работ в своё портфолио.</Text><Button title="Добавить фото или видео" onPress={() => setTab("portfolio")} /><SectionTitle title="Мой прайс" />{prices.map(p => <Text style={styles.priceLine} key={p.id}>{p.title} · {p.amount} ₽</Text>)}<Button title="Редактировать прайс" secondary onPress={() => setTab("profile")} />
             <SectionTitle title="Быстрый старт" />
             {["Заполни описание и услуги", "Добавь фотографии своих работ", "Укажи город и свободное время", "Собирай отзывы клиентов"].map((s, i) => <View style={styles.step} key={s}><Text style={styles.stepNo}>0{i + 1}</Text><Text style={styles.stepText}>{s}</Text></View>)}
-            <Button title="Перейти в мой профиль" onPress={() => setTab("profile")} />
+            <Button title="Открыть календарь и записи" onPress={() => setTab("workspace")} /><Button title="Перейти в мой профиль" onPress={() => setTab("profile")} />
           </>}
         </>}
         {tab === "designs" && <>
@@ -194,6 +195,7 @@ export default function App() {
           {filteredMasters.length === 0 && <Text style={styles.small}>В выбранном городе пока нет мастеров в демонстрационном списке. Другие города не показываются.</Text>}
         </>}
 
+        {tab === "workspace" && <StudioWorkspace role={role} city={city} fullName={profileName || masterName} />}
         {tab === "portfolio" && <>
           <Text style={styles.kicker}>MY PORTFOLIO</Text><Text style={styles.pageTitle}>Портфолио работ</Text>
           <Text style={styles.body}>Загружай фотографии и видео. Это витрина твоих работ, без лайков и комментариев.</Text>
@@ -216,7 +218,7 @@ export default function App() {
         </>}
       </ScrollView>
       <View style={styles.nav}>
-        {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["profile","Профиль"]] : [["home","Главная"],["portfolio","Мои работы"],["designs","Идеи"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
+        {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["workspace","Кабинет"],["profile","Профиль"]] : [["home","Главная"],["portfolio","Мои работы"],["workspace","Календарь"],["designs","Идеи"],["profile","Профиль"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
     </SafeAreaView>
   );
