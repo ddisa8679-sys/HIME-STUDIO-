@@ -20,7 +20,13 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --non-interactive
       - name: Align Kotlin with Compose compiler
-        run: sed -i 's/1\.9\.24/1.9.25/g' android/build.gradle
+        run: |
+          set -e
+          echo "Kotlin version references before patch:"
+          grep -RIn --include='*.gradle' --include='*.gradle.kts' '1\.9\.24' android node_modules/expo-modules-core || true
+          find android node_modules/expo-modules-core -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 | xargs -0 -r sed -i 's/1\.9\.24/1.9.25/g'
+          echo "Kotlin version references after patch:"
+          grep -RIn --include='*.gradle' --include='*.gradle.kts' '1\.9\.24\|1\.9\.25' android node_modules/expo-modules-core || true
       - name: Build installable APK
         working-directory: android
         run: ./gradlew assembleDebug
