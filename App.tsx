@@ -149,7 +149,7 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.welcome}>
         <Text style={styles.brand}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text>
         <Text style={styles.kicker}>BEAUTY · NAIL COMMUNITY</Text>
-        <View style={styles.heroArt}><Text style={styles.heroFlower}>✿</Text><Text style={styles.heroCaption}>ТВОЙ СТИЛЬ. ТВОИ ПРАВИЛА.</Text></View>
+        <View style={styles.heroArt}><AnimeMascot /><Text style={styles.heroCaption}>ТВОЙ СТИЛЬ. ТВОИ ПРАВИЛА.</Text></View>
         <Text style={styles.welcomeTitle}>Добро пожаловать{ "\n" }в HIME STUDIO</Text>
         <Text style={styles.body}>Пространство для тех, кто создаёт красоту и выбирает её.</Text>
         <Button title="Я клиент" onPress={() => { void chooseRole("client"); }} />
@@ -223,6 +223,31 @@ export default function App() {
   );
 }
 
+
+function AnimeMascot() {
+  return (
+    <View style={styles.mascotStage}>
+      <View style={styles.mascotHalo} />
+      <View style={styles.mascotHairBack} />
+      <View style={styles.mascotBody} />
+      <View style={styles.mascotNeck} />
+      <View style={styles.mascotFace}>
+        <View style={styles.mascotFringe} />
+        <View style={styles.mascotEyeRow}>
+          <View style={styles.mascotEye}><View style={styles.mascotEyeShine} /></View>
+          <View style={styles.mascotEye}><View style={styles.mascotEyeShine} /></View>
+        </View>
+        <View style={styles.mascotBlushLeft} /><View style={styles.mascotBlushRight} />
+        <View style={styles.mascotMouth} />
+      </View>
+      <View style={styles.mascotHairSideLeft} /><View style={styles.mascotHairSideRight} />
+      <View style={styles.mascotArm}><View style={styles.mascotHand}><View style={styles.mascotNail} /><View style={[styles.mascotNail, styles.mascotNailTwo]} /><View style={[styles.mascotNail, styles.mascotNailThree]} /></View></View>
+      <View style={styles.mascotBow}><View style={styles.mascotBowLoop} /><View style={[styles.mascotBowLoop, styles.mascotBowLoopRight]} /><View style={styles.mascotBowKnot} /></View>
+      <View style={styles.mascotSparkle}><Text style={styles.mascotSparkleText}>✦</Text></View>
+    </View>
+  );
+}
+
 function DesignCard({ item, index }: { item: typeof designs[number]; index: number }) {
   return <View style={styles.designCard}><View style={[styles.designVisual, index % 2 === 0 ? styles.visualDark : styles.visualLight]}><Text style={styles.visualMark}>{item.mark}</Text><Text style={styles.visualLabel}>HIME NAIL DESIGN</Text></View><View style={styles.designInfo}><Text style={styles.tag}>{item.tag}</Text><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.small}>{item.detail}</Text></View></View>;
 }
@@ -234,7 +259,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper }, welcome: { flexGrow: 1, padding: 26, justifyContent: "center" },
   brand: { fontSize: 24, letterSpacing: 5, fontWeight: "800", color: ink }, brandSmall: { fontSize: 15, letterSpacing: 2, fontWeight: "800", color: ink }, brandAccent: { color: burgundy },
   kicker: { color: burgundy, letterSpacing: 3, fontSize: 10, fontWeight: "800", marginTop: 24, marginBottom: 10 },
-  heroArt: { height: 170, marginTop: 28, marginBottom: 26, borderRadius: 18, backgroundColor: "#EDE2E3", alignItems: "center", justifyContent: "center" }, heroFlower: { color: burgundy, fontSize: 82 }, heroCaption: { color: burgundy, fontSize: 9, letterSpacing: 3, fontWeight: "700" },
+  heroArt: { height: 230, marginTop: 28, marginBottom: 26, borderRadius: 18, backgroundColor: "#EDE2E3", alignItems: "center", justifyContent: "flex-end", overflow: "hidden", paddingBottom: 15 }, heroCaption: { color: burgundy, fontSize: 9, letterSpacing: 3, fontWeight: "700" },
+  mascotStage: { width: 230, height: 188, alignItems: "center", justifyContent: "flex-end" }, mascotHalo: { position: "absolute", width: 166, height: 166, borderRadius: 83, backgroundColor: "#F7EFF0", top: 10 }, mascotHairBack: { position: "absolute", width: 116, height: 142, borderTopLeftRadius: 58, borderTopRightRadius: 58, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: "#351522", top: 19 }, mascotBody: { position: "absolute", width: 116, height: 64, borderTopLeftRadius: 55, borderTopRightRadius: 55, backgroundColor: "#76263E", bottom: 0 }, mascotNeck: { position: "absolute", width: 27, height: 28, backgroundColor: "#F2C7B9", borderBottomLeftRadius: 12, borderBottomRightRadius: 12, bottom: 48, zIndex: 2 }, mascotFace: { position: "absolute", width: 84, height: 100, borderRadius: 42, backgroundColor: "#F6D2C5", top: 42, zIndex: 3, alignItems: "center" }, mascotFringe: { position: "absolute", top: -3, width: 88, height: 48, borderTopLeftRadius: 45, borderTopRightRadius: 45, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: "#351522" }, mascotEyeRow: { position: "absolute", top: 48, width: 56, flexDirection: "row", justifyContent: "space-between" }, mascotEye: { width: 13, height: 18, borderRadius: 9, backgroundColor: "#351522", alignItems: "flex-end", padding: 3 }, mascotEyeShine: { width: 4, height: 5, borderRadius: 3, backgroundColor: "#FFF" }, mascotBlushLeft: { position: "absolute", left: 8, top: 68, width: 15, height: 6, borderRadius: 8, backgroundColor: "#E9A4A5", opacity: 0.65 }, mascotBlushRight: { position: "absolute", right: 8, top: 68, width: 15, height: 6, borderRadius: 8, backgroundColor: "#E9A4A5", opacity: 0.65 }, mascotMouth: { position: "absolute", top: 76, width: 10, height: 5, borderBottomWidth: 2, borderColor: "#A85C68", borderRadius: 8 }, mascotHairSideLeft: { position: "absolute", left: 58, top: 68, width: 25, height: 88, borderBottomLeftRadius: 22, borderBottomRightRadius: 20, backgroundColor: "#351522", zIndex: 4, transform: [{ rotate: "8deg" }] }, mascotHairSideRight: { position: "absolute", right: 58, top: 67, width: 25, height: 90, borderBottomLeftRadius: 20, borderBottomRightRadius: 22, backgroundColor: "#351522", zIndex: 4, transform: [{ rotate: "-8deg" }] }, mascotArm: { position: "absolute", right: 45, bottom: 21, width: 22, height: 75, borderRadius: 14, backgroundColor: "#F2C7B9", zIndex: 5, transform: [{ rotate: "-42deg" }] }, mascotHand: { position: "absolute", top: -12, left: -7, width: 35, height: 29, borderRadius: 18, backgroundColor: "#F2C7B9", transform: [{ rotate: "20deg" }] }, mascotNail: { position: "absolute", top: 4, left: 7, width: 6, height: 9, borderRadius: 4, backgroundColor: "#8E2948", borderWidth: 1, borderColor: "#F5D6D5" }, mascotNailTwo: { left: 16, top: 1 }, mascotNailThree: { left: 24, top: 5 }, mascotBow: { position: "absolute", top: 24, right: 65, zIndex: 6, flexDirection: "row" }, mascotBowLoop: { width: 17, height: 13, borderRadius: 10, backgroundColor: "#9A3652", transform: [{ rotate: "25deg" }] }, mascotBowLoopRight: { transform: [{ rotate: "-25deg" }] }, mascotBowKnot: { position: "absolute", width: 8, height: 8, borderRadius: 5, backgroundColor: "#D9A9A9", left: 13, top: 3 }, mascotSparkle: { position: "absolute", left: 36, top: 47 }, mascotSparkleText: { color: "#A65A70", fontSize: 22 },
   welcomeTitle: { color: ink, fontSize: 32, lineHeight: 39, fontWeight: "700" }, pageTitle: { color: ink, fontSize: 30, lineHeight: 36, fontWeight: "700" }, body: { color: muted, fontSize: 14, lineHeight: 21, marginTop: 10, marginBottom: 18 },
   button: { backgroundColor: burgundy, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 10 }, buttonSecondary: { backgroundColor: "#F0E7E8", borderWidth: 1, borderColor: "#E5D4D8" }, buttonText: { color: "#FFF", fontSize: 14, fontWeight: "700" }, buttonTextSecondary: { color: burgundy },
   footnote: { color: muted, fontSize: 11, textAlign: "center", marginTop: 18 }, topbar: { height: 64, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderColor: "#EEE7E7" }, headerName: { color: muted, fontSize: 10, marginTop: 3, maxWidth: 190 }, back: { color: burgundy, fontWeight: "700" }, roleTag: { color: muted, fontSize: 9, letterSpacing: 2 },
