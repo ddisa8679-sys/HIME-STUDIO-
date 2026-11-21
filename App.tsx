@@ -415,7 +415,7 @@ export default function App() {
           {filteredMasters.length === 0 && <Text style={styles.small}>В выбранном городе пока нет мастеров в демонстрационном списке. Другие города не показываются.</Text>}
         </>}
 
-        {tab === "workspace" && <StudioWorkspace role={role} city={city} fullName={profileName || masterName} />}
+        {tab === "workspace" && <StudioWorkspace role={role || "client"} city={city} fullName={profileName || masterName} />}
         {tab === "admin" && isAdmin && <AdminWorkspace />}
         {tab === "portfolio" && <>
           <Text style={styles.kicker}>MY PORTFOLIO</Text><Text style={styles.pageTitle}>Портфолио работ</Text>
