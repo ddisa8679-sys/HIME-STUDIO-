@@ -13,7 +13,7 @@ type Post = { id: string | number; uri: string; kind: string; caption: string };
 type Price = { id: number; title: string; amount: string };
 type BookingService = { id: string; title: string; price: string; duration_minutes: number };
 type City = { id: number; name: string; region: string | null };
-type Master = { user_id: string; name: string; city: string; bio: string; avatar_path: string | null; rating: string; reviews: string; work: string };
+type Master = { user_id: string; name: string; city: string; bio: string; avatar_path: string | null; rating: string; reviews: string; work: string; promoted?: boolean; promotionPlan?: string };
 
 const burgundy = "#651D32";
 const ink = "#171316";
@@ -57,6 +57,10 @@ export default function App() {
   const [bookingDays, setBookingDays] = useState<{date:string;label:string;slots:{label:string;iso:string}[]}[]>([]);
   const [selectedBookingSlot, setSelectedBookingSlot] = useState("");
   const [bookingNote, setBookingNote] = useState("");
+  const [waitlistDate, setWaitlistDate] = useState("");
+  const [waitlistFrom, setWaitlistFrom] = useState("");
+  const [waitlistTo, setWaitlistTo] = useState("");
+  const [waitlistNote, setWaitlistNote] = useState("");
   const [masterCity, setMasterCity] = useState("Екатеринбург");
   const [masterName, setMasterName] = useState("");
   const [profileName, setProfileName] = useState("");
@@ -76,10 +80,12 @@ export default function App() {
       const { data: masterRows } = await supabase.from("master_profiles").select("user_id,display_name,bio,avatar_path").eq("is_visible", true);
       if (!masterRows?.length || !active) { if (active) setMasters([]); return; }
       const ids = masterRows.map(m => m.user_id);
-      const [{ data: profiles }, { data: services }, { data: reviews }] = await Promise.all([
+      const today = new Date().toISOString().slice(0,10);
+      const [{ data: profiles }, { data: services }, { data: reviews }, { data: promotions }] = await Promise.all([
         supabase.from("profiles").select("user_id,city_id").in("user_id", ids),
         supabase.from("master_services").select("master_id,title").in("master_id", ids).eq("is_active", true),
         supabase.from("reviews").select("master_id,rating").in("master_id", ids),
+        supabase.from("master_promotions").select("master_id,plan").in("master_id", ids).eq("status", "active").lte("starts_on", today).gte("ends_on", today),
       ]);
       const cityIds = [...new Set((profiles || []).map(p => p.city_id).filter(Boolean))];
       const { data: cityLookup } = cityIds.length ? await supabase.from("cities").select("id,name").in("id", cityIds) : { data: [] as any[] };
@@ -89,9 +95,11 @@ export default function App() {
       (services || []).forEach(s => serviceMap.set(s.master_id,[...(serviceMap.get(s.master_id)||[]),s.title]));
       const reviewMap = new Map<string,number[]>();
       (reviews || []).forEach(r => reviewMap.set(r.master_id,[...(reviewMap.get(r.master_id)||[]),r.rating]));
+      const promotionMap = new Map<string,string>();
+      (promotions || []).forEach(p => promotionMap.set(p.master_id,p.plan));
       const mapped: Master[] = masterRows.map(m => {
         const ratings = reviewMap.get(m.user_id) || [];
-        return { user_id:m.user_id, name:m.display_name || "Мастер HIME", city:cityMap.get(profileMap.get(m.user_id)?.city_id) || "", bio:m.bio || "", avatar_path:m.avatar_path, rating:ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : "—", reviews:ratings.length ? ratings.length+" отзывов" : "Пока без отзывов", work:(serviceMap.get(m.user_id)||[]).join(" · ") || "Услуги уточняются" };
+        return { user_id:m.user_id, name:m.display_name || "Мастер HIME", city:cityMap.get(profileMap.get(m.user_id)?.city_id) || "", bio:m.bio || "", avatar_path:m.avatar_path, rating:ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : "—", reviews:ratings.length ? ratings.length+" отзывов" : "Пока без отзывов", work:(serviceMap.get(m.user_id)||[]).join(" · ") || "Услуги уточняются", promoted:promotionMap.has(m.user_id), promotionPlan:promotionMap.get(m.user_id) };
       }).filter(m => !!m.city);
       if (active) setMasters(mapped);
     };
@@ -100,7 +108,7 @@ export default function App() {
   }, []);
 
 
-  const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))), [query, city, masters]);
+  const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>Number(!!b.promoted)-Number(!!a.promoted) || Number(b.promotionPlan === "top")-Number(a.promotionPlan === "top")), [query, city, masters]);
   useEffect(() => {
     let active = true;
     const loadSaved = async () => {
@@ -130,13 +138,24 @@ export default function App() {
     setBookingServices([]);
     setSelectedBookingService(null);
     const [{ data: reviews }, { data: services, error: servicesError }] = await Promise.all([
-      supabase.from("reviews").select("id,rating,body,created_at").eq("master_id", master.user_id).order("created_at", { ascending: false }),
+      supabase.from("reviews").select("id,rating,body,photo_path,created_at").eq("master_id", master.user_id).order("created_at", { ascending: false }),
       supabase.from("master_services").select("id,title,price,duration_minutes").eq("master_id", master.user_id).eq("is_active", true).order("position"),
     ]);
     setMasterReviews(reviews || []);
     if (servicesError) Alert.alert("Не удалось загрузить услуги", servicesError.message);
     else setBookingServices((services || []).map(s => ({...s,duration_minutes:s.duration_minutes || 60})));
   };
+  const joinWaitlist = async () => {
+    if (!selectedMaster) return;
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return Alert.alert("Нужен вход", "Войди в аккаунт, чтобы попасть в лист ожидания.");
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(waitlistDate)) return Alert.alert("Укажи дату", "Используй формат ГГГГ-ММ-ДД.");
+    if ((waitlistFrom && !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(waitlistFrom)) || (waitlistTo && !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(waitlistTo)) || (waitlistFrom && waitlistTo && waitlistFrom >= waitlistTo)) return Alert.alert("Проверь время", "Укажи интервал в формате ЧЧ:ММ.");
+    const { error } = await supabase.from("master_waitlist").insert({ client_id: auth.user.id, master_id: selectedMaster.user_id, service_id: selectedBookingService?.id || null, desired_date: waitlistDate, preferred_from: waitlistFrom || null, preferred_to: waitlistTo || null, client_note: waitlistNote.trim() });
+    if (error) Alert.alert("Не удалось добавить в лист ожидания", error.message);
+    else { setWaitlistDate(""); setWaitlistFrom(""); setWaitlistTo(""); setWaitlistNote(""); Alert.alert("Ты в листе ожидания", "Если на выбранную дату освободится подходящее время, придёт уведомление."); }
+  };
+
   useEffect(() => {
     let active = true;
     const loadAvailableSlots = async () => {
@@ -415,7 +434,7 @@ export default function App() {
       <View style={styles.nav}>
         {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["workspace","Кабинет"],["profile","Профиль"]] : [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["workspace","Кабинет"],["profile","Профиль"],["portfolio","Портфолио"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><NavMascot active={tab === key} /><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
-      <Modal visible={!!selectedMaster} animationType="slide" transparent onRequestClose={() => setSelectedMaster(null)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><ScrollView keyboardShouldPersistTaps="handled">{selectedMaster && <><Text style={styles.pageTitle}>{selectedMaster.name}</Text><Text style={styles.small}>{selectedMaster.city}</Text><Text style={styles.stars}>{selectedMaster.rating === "—" ? "Пока без оценок" : "★ "+selectedMaster.rating} · {selectedMaster.reviews}</Text><Text style={styles.sectionTitle}>О мастере</Text><Text style={styles.body}>{selectedMaster.bio || "Мастер пока не добавил описание."}</Text><Text style={styles.sectionTitle}>Услуги</Text><Text style={styles.body}>{selectedMaster.work}</Text><Text style={styles.sectionTitle}>Отзывы клиентов</Text>{masterReviews.length ? masterReviews.map(r => <View key={r.id} style={styles.review}><Text style={styles.stars}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</Text><Text style={styles.small}>{r.body || "Клиент оставил оценку без комментария."}</Text><Text style={styles.small}>{new Date(r.created_at).toLocaleDateString("ru-RU")}</Text></View>) : <Text style={styles.small}>Подтверждённых отзывов пока нет. Здесь будут отображаться только отзывы, привязанные к завершённым записям.</Text>}{role === "client" && <><Text style={styles.sectionTitle}>Выбери услугу</Text>{bookingServices.length ? <View style={styles.chips}>{bookingServices.map(service=><TouchableOpacity key={service.id} onPress={()=>{setSelectedBookingService(service);setSelectedBookingSlot("");}} style={[styles.chip,selectedBookingService?.id===service.id&&styles.chipActive]}><Text style={[styles.chipText,selectedBookingService?.id===service.id&&styles.chipTextActive]}>{service.title} · {service.price ? service.price+" ₽" : "цена уточняется"} · {service.duration_minutes} мин</Text></TouchableOpacity>)}</View> : <Text style={styles.small}>У мастера пока нет опубликованных услуг для онлайн-записи.</Text>}{!!selectedBookingService&&<><Text style={styles.sectionTitle}>Свободное время · ближайшие 14 дней</Text><Text style={styles.small}>Длительность: {selectedBookingService.duration_minutes} минут. Учитываются рабочие часы, перерывы, выходные и занятые записи.</Text>{bookingDays.length ? bookingDays.map(day=><View key={day.date} style={{marginTop:12}}><Text style={styles.cardTitle}>{day.label}</Text><View style={styles.chips}>{day.slots.map(slot=><TouchableOpacity key={slot.iso} onPress={()=>setSelectedBookingSlot(slot.iso)} style={[styles.chip,selectedBookingSlot===slot.iso&&styles.chipActive]}><Text style={[styles.chipText,selectedBookingSlot===slot.iso&&styles.chipTextActive]}>{slot.label}</Text></TouchableOpacity>)}</View></View>) : <Text style={styles.small}>Свободных интервалов нет или мастер ещё не настроил рабочий график.</Text>}{!!selectedBookingSlot&&<Text style={styles.stars}>Выбрано: {new Date(selectedBookingSlot).toLocaleString("ru-RU")}</Text>}<TextInput value={bookingNote} onChangeText={setBookingNote} placeholder="Комментарий к записи (необязательно)" style={[styles.input,styles.multiline]} multiline/><Button title="Отправить заявку на выбранное время" onPress={() => { void createBooking(); }}/></>}</>}</>}</ScrollView><Button title="Закрыть профиль" secondary onPress={() => setSelectedMaster(null)}/></View></View></Modal>
+      <Modal visible={!!selectedMaster} animationType="slide" transparent onRequestClose={() => setSelectedMaster(null)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><ScrollView keyboardShouldPersistTaps="handled">{selectedMaster && <><Text style={styles.pageTitle}>{selectedMaster.name}</Text>{selectedMaster.promoted && <Text style={{color:burgundy,backgroundColor:"#F5E9EC",padding:7,borderRadius:8,alignSelf:"flex-start",fontSize:9,fontWeight:"800"}}>{selectedMaster.promotionPlan === "top" ? "★ В ТОПЕ ГОРОДА" : "✦ РЕКОМЕНДОВАННЫЙ МАСТЕР"}</Text>}<Text style={styles.small}>{selectedMaster.city}</Text><Text style={styles.stars}>{selectedMaster.rating === "—" ? "Пока без оценок" : "★ "+selectedMaster.rating} · {selectedMaster.reviews}</Text><Text style={styles.sectionTitle}>О мастере</Text><Text style={styles.body}>{selectedMaster.bio || "Мастер пока не добавил описание."}</Text><Text style={styles.sectionTitle}>Услуги</Text><Text style={styles.body}>{selectedMaster.work}</Text><Text style={styles.sectionTitle}>Отзывы клиентов</Text>{masterReviews.length ? masterReviews.map(r => <View key={r.id} style={styles.review}><Text style={styles.stars}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</Text><Text style={styles.small}>{r.body || "Клиент оставил оценку без комментария."}</Text>{!!r.photo_path && <Image source={{uri:supabase.storage.from("hime-review-photos").getPublicUrl(r.photo_path).data.publicUrl}} style={{width:160,height:160,borderRadius:12,marginTop:8}} resizeMode="cover"/>}<Text style={styles.small}>{new Date(r.created_at).toLocaleDateString("ru-RU")}</Text></View>) : <Text style={styles.small}>Подтверждённых отзывов пока нет. Здесь будут отображаться только отзывы, привязанные к завершённым записям.</Text>}{role === "client" && <><Text style={styles.sectionTitle}>Не нашла удобное время?</Text><Text style={styles.small}>Оставь желаемую дату — при отмене записи подходящие клиенты получат уведомление.</Text><TextInput value={waitlistDate} onChangeText={setWaitlistDate} placeholder="Дата: ГГГГ-ММ-ДД" style={styles.input}/><View style={styles.row}><TextInput value={waitlistFrom} onChangeText={setWaitlistFrom} placeholder="С 10:00" style={[styles.input,{flex:1}]}/><TextInput value={waitlistTo} onChangeText={setWaitlistTo} placeholder="До 18:00" style={[styles.input,{flex:1}]}/></View><TextInput value={waitlistNote} onChangeText={setWaitlistNote} placeholder="Комментарий (необязательно)" style={styles.input}/><Button title="Встать в лист ожидания" secondary onPress={() => { void joinWaitlist(); }}/><Text style={styles.sectionTitle}>Выбери услугу</Text>{bookingServices.length ? <View style={styles.chips}>{bookingServices.map(service=><TouchableOpacity key={service.id} onPress={()=>{setSelectedBookingService(service);setSelectedBookingSlot("");}} style={[styles.chip,selectedBookingService?.id===service.id&&styles.chipActive]}><Text style={[styles.chipText,selectedBookingService?.id===service.id&&styles.chipTextActive]}>{service.title} · {service.price ? service.price+" ₽" : "цена уточняется"} · {service.duration_minutes} мин</Text></TouchableOpacity>)}</View> : <Text style={styles.small}>У мастера пока нет опубликованных услуг для онлайн-записи.</Text>}{!!selectedBookingService&&<><Text style={styles.sectionTitle}>Свободное время · ближайшие 14 дней</Text><Text style={styles.small}>Длительность: {selectedBookingService.duration_minutes} минут. Учитываются рабочие часы, перерывы, выходные и занятые записи.</Text>{bookingDays.length ? bookingDays.map(day=><View key={day.date} style={{marginTop:12}}><Text style={styles.cardTitle}>{day.label}</Text><View style={styles.chips}>{day.slots.map(slot=><TouchableOpacity key={slot.iso} onPress={()=>setSelectedBookingSlot(slot.iso)} style={[styles.chip,selectedBookingSlot===slot.iso&&styles.chipActive]}><Text style={[styles.chipText,selectedBookingSlot===slot.iso&&styles.chipTextActive]}>{slot.label}</Text></TouchableOpacity>)}</View></View>) : <Text style={styles.small}>Свободных интервалов нет или мастер ещё не настроил рабочий график.</Text>}{!!selectedBookingSlot&&<Text style={styles.stars}>Выбрано: {new Date(selectedBookingSlot).toLocaleString("ru-RU")}</Text>}<TextInput value={bookingNote} onChangeText={setBookingNote} placeholder="Комментарий к записи (необязательно)" style={[styles.input,styles.multiline]} multiline/><Button title="Отправить заявку на выбранное время" onPress={() => { void createBooking(); }}/></>}</>}</>}</ScrollView><Button title="Закрыть профиль" secondary onPress={() => setSelectedMaster(null)}/></View></View></Modal>
       <Modal visible={cityPickerVisible} animationType="slide" transparent onRequestClose={() => setCityPickerVisible(false)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><Text style={styles.sectionTitle}>Выбери город</Text><TextInput value={citySearch} onChangeText={setCitySearch} placeholder="Поиск города или региона" style={styles.input} /><ScrollView keyboardShouldPersistTaps="handled">{cities.filter(x => (x.name+" "+(x.region||"")).toLowerCase().includes(citySearch.toLowerCase())).map(x => <TouchableOpacity key={x.id} style={styles.cityOption} onPress={() => { setCity(x.name); setCityId(x.id); setMasterCity(x.name); setCityPickerVisible(false); setCitySearch(""); }}><Text style={styles.cardTitle}>{x.name}</Text><Text style={styles.small}>{x.region || "Россия"}</Text></TouchableOpacity>)}</ScrollView><Button title="Закрыть" secondary onPress={() => setCityPickerVisible(false)} /></View></View></Modal>
     </SafeAreaView>
   );
@@ -451,7 +470,7 @@ function DesignCard({ item, index }: { item: typeof designs[number]; index: numb
 }
 function MasterCard({ item, onPress, saved = false, onToggleSaved }: { item: typeof masters[number]; onPress: () => void; saved?: boolean; onToggleSaved?: () => void }) {
   const avatar = item.avatar_path ? supabase.storage.from("hime-portfolio").getPublicUrl(item.avatar_path).data.publicUrl : null;
-  return <View style={styles.masterCard}><View style={styles.masterRow}>{avatar ? <Image source={{uri:avatar}} style={styles.profileImage} /> : <PhotoPlaceholder />}<View style={{ flex: 1 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.small}>{item.city}</Text><Text style={styles.stars}>{item.rating === "—" ? "Без оценок" : "★ "+item.rating} <Text style={styles.small}>· {item.reviews}</Text></Text></View></View><Text style={styles.small}>{item.work}</Text><Button title="Посмотреть профиль и отзывы" secondary onPress={onPress} />{onToggleSaved && <Button title={saved ? "♥ В избранном · Убрать" : "♡ В избранное"} secondary onPress={onToggleSaved} />}</View>;
+  return <View style={styles.masterCard}>{item.promoted && <Text style={{color:burgundy,backgroundColor:"#F5E9EC",padding:7,borderRadius:8,alignSelf:"flex-start",fontSize:9,fontWeight:"800",marginBottom:8}}>{item.promotionPlan === "top" ? "★ В ТОПЕ ГОРОДА" : "✦ РЕКОМЕНДОВАННЫЙ МАСТЕР"}</Text>}<View style={styles.masterRow}>{avatar ? <Image source={{uri:avatar}} style={styles.profileImage} /> : <PhotoPlaceholder />}<View style={{ flex: 1 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.small}>{item.city}</Text><Text style={styles.stars}>{item.rating === "—" ? "Без оценок" : "★ "+item.rating} <Text style={styles.small}>· {item.reviews}</Text></Text></View></View><Text style={styles.small}>{item.work}</Text><Button title="Посмотреть профиль и отзывы" secondary onPress={onPress} />{onToggleSaved && <Button title={saved ? "♥ В избранном · Убрать" : "♡ В избранное"} secondary onPress={onToggleSaved} />}</View>;
 }
 
 const styles = StyleSheet.create({
