@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "totalDesignSlots": 1200,
+  "status": "awaiting_photography",
+  "imageFormat": "webp",
+  "recommendedDimensions": "1200x1500",
+  "naming": "design-0001.webp through design-1200.webp",
+  "categories": [
+    "bright",
+    "light",
+    "dark",
+    "nude",
+    "pastel",
+    "french",
+    "matte",
+    "glossy",
+    "glitter",
+    "minimal",
+    "floral",
+    "chrome",
+    "abstract"
+  ],
+  "lengths": [
+    "short",
+    "medium",
+    "long",
+    "extra-long"
+  ],
+  "note": "No photo files are included yet. Add licensed or original photos, then register each image path in the catalog photo map."
+}
