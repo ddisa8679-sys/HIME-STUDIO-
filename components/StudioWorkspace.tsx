@@ -3,7 +3,8 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import { supabase } from "../lib/supabase";
 
 type Role = "client" | "master";
-type Screen = "calendar" | "tasks" | "bookings" | "favorites" | "notifications" | "settings";
+type Screen = "calendar" | "services" | "tasks" | "bookings" | "favorites" | "notifications" | "settings";
+type Service = { id: string; title: string; price: string; duration_minutes: number; is_active: boolean; position: number };
 const burgundy = "#651D32";
 const weekdays = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
 
@@ -18,6 +19,11 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
   const [screen, setScreen] = useState<Screen>(role === "master" ? "calendar" : "bookings");
   const [userId, setUserId] = useState("");
   const [rows, setRows] = useState<any[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [serviceTitle, setServiceTitle] = useState("");
+  const [servicePrice, setServicePrice] = useState("");
+  const [serviceDuration, setServiceDuration] = useState("60");
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [favorites, setFavorites] = useState<any[]>([]);
@@ -41,6 +47,9 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
     if (screen === "calendar") {
       const { data, error } = await supabase.from("master_working_hours").select("*").eq("master_id", auth.user.id).order("weekday");
       if (!error) setRows(data || []);
+    } else if (screen === "services") {
+      const { data, error } = await supabase.from("master_services").select("id,title,price,duration_minutes,is_active,position").eq("master_id", auth.user.id).order("position");
+      if (error) Alert.alert("Не удалось загрузить прайс", error.message); else setServices((data || []) as Service[]);
     } else if (screen === "tasks") {
       const { data, error } = await supabase.from("master_tasks").select("*").eq("master_id", auth.user.id).order("due_at", { ascending: true });
       if (!error) setTasks(data || []);
@@ -73,6 +82,44 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
     const { error } = await supabase.from("master_breaks").insert({ master_id: userId, weekday: Number(breakDay), starts_at: breakStart, ends_at: breakEnd });
     if (error) Alert.alert("Не удалось добавить перерыв", error.message);
     else Alert.alert("Готово", "Перерыв добавлен в расписание.");
+  };
+
+  const resetServiceForm = () => { setServiceTitle(""); setServicePrice(""); setServiceDuration("60"); setEditingServiceId(null); };
+
+  const saveService = async () => {
+    const title = serviceTitle.trim();
+    const price = servicePrice.trim();
+    const duration = Number(serviceDuration);
+    if (!title) return Alert.alert("Укажи услугу", "Название услуги не может быть пустым.");
+    if (!Number.isInteger(duration) || duration < 15 || duration > 480) return Alert.alert("Проверь длительность", "Укажи целое число от 15 до 480 минут.");
+    if (!userId) return;
+    setBusy(true);
+    const payload = { title, price, duration_minutes: duration };
+    const result = editingServiceId
+      ? await supabase.from("master_services").update(payload).eq("id", editingServiceId).eq("master_id", userId)
+      : await supabase.from("master_services").insert({ ...payload, master_id: userId, is_active: true, position: services.length });
+    setBusy(false);
+    if (result.error) Alert.alert("Не удалось сохранить услугу", result.error.message);
+    else { resetServiceForm(); void load(); }
+  };
+
+  const editService = (service: Service) => {
+    setEditingServiceId(service.id); setServiceTitle(service.title); setServicePrice(service.price || ""); setServiceDuration(String(service.duration_minutes || 60));
+  };
+
+  const toggleService = async (service: Service) => {
+    const { error } = await supabase.from("master_services").update({ is_active: !service.is_active }).eq("id", service.id).eq("master_id", userId);
+    if (error) Alert.alert("Не удалось изменить публикацию", error.message); else void load();
+  };
+
+  const deleteService = (service: Service) => {
+    Alert.alert("Удалить услугу?", "«" + service.title + "» будет удалена из прайса и перестанет отображаться клиентам.", [
+      { text: "Отмена", style: "cancel" },
+      { text: "Удалить", style: "destructive", onPress: async () => {
+        const { error } = await supabase.from("master_services").delete().eq("id", service.id).eq("master_id", userId);
+        if (error) Alert.alert("Не удалось удалить услугу", error.message); else { if (editingServiceId === service.id) resetServiceForm(); void load(); }
+      } },
+    ]);
   };
 
   const addTask = async () => {
@@ -123,7 +170,7 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
   };
 
   const menu: [Screen, string][] = role === "master"
-    ? [["calendar", "Календарь"], ["bookings", "Записи"], ["tasks", "Задачи"], ["notifications", "Уведомления"], ["settings", "Настройки"]]
+    ? [["calendar", "Календарь"], ["services", "Мой прайс"], ["bookings", "Записи"], ["tasks", "Задачи"], ["notifications", "Уведомления"], ["settings", "Настройки"]]
     : [["bookings", "Мои записи"], ["favorites", "Избранное"], ["notifications", "Уведомления"], ["settings", "Настройки"]];
 
   return <View style={s.wrap}>
@@ -137,6 +184,21 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
         <Text style={s.label}>Время работы для выбранного дня</Text><View style={s.row}><View style={{flex:1}}><Field value={editStart} onChangeText={setEditStart} placeholder="Начало, 10:00"/></View><View style={{flex:1}}><Field value={editEnd} onChangeText={setEditEnd} placeholder="Конец, 19:00"/></View></View>
         {weekdays.map((day, i) => { const item = rows.find(x => x.weekday === i); return <View key={day} style={s.card}><View style={s.row}><Text style={s.cardTitle}>{day}</Text><Text style={s.note}>{item ? (item.is_working ? item.starts_at?.slice(0,5)+"–"+item.ends_at?.slice(0,5) : "Выходной") : "Не настроено"}</Text></View><View style={s.row}><Action title="Рабочий день" secondary onPress={() => void saveHours(i, true)}/><Action title="Выходной" secondary onPress={() => void saveHours(i, false)}/></View></View>; })}
         <Text style={s.heading}>Добавить перерыв</Text><Field value={breakDay} onChangeText={setBreakDay} placeholder="День недели: 0–6 (0 — воскресенье)"/><View style={s.row}><View style={{flex:1}}><Field value={breakStart} onChangeText={setBreakStart} placeholder="13:00"/></View><View style={{flex:1}}><Field value={breakEnd} onChangeText={setBreakEnd} placeholder="14:00"/></View></View><Action title="Сохранить перерыв" onPress={() => void addBreak()}/><Text style={s.heading}>Разовый выходной</Text><Field value={dayOffDate} onChangeText={setDayOffDate} placeholder="Дата: 2026-12-31"/><Action title="Добавить выходной" secondary onPress={() => void addDayOff()}/>
+      </>}
+      {screen === "services" && role === "master" && <>
+        <Text style={s.title}>Мой прайс</Text>
+        <Text style={s.note}>Добавляй услуги, указывай стоимость и длительность. Скрытые услуги останутся в кабинете, но исчезнут из каталога и онлайн-записи.</Text>
+        <Text style={s.heading}>{editingServiceId ? "Редактировать услугу" : "Новая услуга"}</Text>
+        <Field value={serviceTitle} onChangeText={setServiceTitle} placeholder="Название услуги, например маникюр с покрытием"/>
+        <View style={s.row}><View style={{flex:1}}><Field value={servicePrice} onChangeText={setServicePrice} placeholder="Цена, например 2000 ₽"/></View><View style={{flex:1}}><Field value={serviceDuration} onChangeText={setServiceDuration} placeholder="Минуты"/></View></View>
+        <View style={s.row}><Action title={busy ? "Сохранение…" : editingServiceId ? "Сохранить изменения" : "Добавить услугу"} onPress={() => void saveService()}/>{!!editingServiceId && <Action title="Отмена" secondary onPress={resetServiceForm}/>}</View>
+        <Text style={s.heading}>Услуги в прайсе · {services.length}</Text>
+        {services.map(service => <View key={service.id} style={s.card}>
+          <View style={s.row}><Text style={s.cardTitle}>{service.title}</Text><Text style={s.note}>{service.is_active ? "Опубликована" : "Скрыта"}</Text></View>
+          <Text style={s.note}>{service.price || "Цена по договорённости"} · {service.duration_minutes || 60} мин</Text>
+          <View style={s.row}><Action title="Изменить" secondary onPress={() => editService(service)}/><Action title={service.is_active ? "Скрыть" : "Опубликовать"} secondary onPress={() => void toggleService(service)}/><Action title="Удалить" secondary onPress={() => deleteService(service)}/></View>
+        </View>)}
+        {!services.length && <Text style={s.note}>Прайс пока пуст. Добавь первую услугу выше.</Text>}
       </>}
       {screen === "tasks" && role === "master" && <>
         <Text style={s.title}>Мои задачи</Text><Field value={taskTitle} onChangeText={setTaskTitle} placeholder="Например, заказать материалы"/><Field value={taskDue} onChangeText={setTaskDue} placeholder="Срок: 2026-11-25T15:00:00"/><Action title="Добавить задачу" onPress={() => void addTask()}/>
