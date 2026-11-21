@@ -68,7 +68,7 @@ create policy "Masters update own pending promotions" on public.master_promotion
 
 drop policy if exists "Public read reviews" on public.reviews;
 create policy "Public read reviews" on public.reviews for select to anon, authenticated using (true);
-do $
+do $$
 declare p record;
 begin
   for p in select policyname from pg_policies
@@ -76,7 +76,7 @@ begin
   loop
     execute format('drop policy %I on public.reviews', p.policyname);
   end loop;
-end $;
+end $$;
 create policy "Clients create reviews for completed bookings" on public.reviews for insert to authenticated with check (
   auth.uid() = client_id and exists (
     select 1 from public.bookings b
