@@ -149,8 +149,8 @@ export default function App() {
     if (!selectedMaster) return;
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) return Alert.alert("Нужен вход", "Войди в аккаунт, чтобы попасть в лист ожидания.");
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(waitlistDate)) return Alert.alert("Укажи дату", "Используй формат ГГГГ-ММ-ДД.");
-    if ((waitlistFrom && !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(waitlistFrom)) || (waitlistTo && !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(waitlistTo)) || (waitlistFrom && waitlistTo && waitlistFrom >= waitlistTo)) return Alert.alert("Проверь время", "Укажи интервал в формате ЧЧ:ММ.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(waitlistDate)) return Alert.alert("Укажи дату", "Используй формат ГГГГ-ММ-ДД.");
+    if ((waitlistFrom && !/^([01]\d|2[0-3]):[0-5]\d$/.test(waitlistFrom)) || (waitlistTo && !/^([01]\d|2[0-3]):[0-5]\d$/.test(waitlistTo)) || (waitlistFrom && waitlistTo && waitlistFrom >= waitlistTo)) return Alert.alert("Проверь время", "Укажи интервал в формате ЧЧ:ММ.");
     const { error } = await supabase.from("master_waitlist").insert({ client_id: auth.user.id, master_id: selectedMaster.user_id, service_id: selectedBookingService?.id || null, desired_date: waitlistDate, preferred_from: waitlistFrom || null, preferred_to: waitlistTo || null, client_note: waitlistNote.trim() });
     if (error) Alert.alert("Не удалось добавить в лист ожидания", error.message);
     else { setWaitlistDate(""); setWaitlistFrom(""); setWaitlistTo(""); setWaitlistNote(""); Alert.alert("Ты в листе ожидания", "Если на выбранную дату освободится подходящее время, придёт уведомление."); }
