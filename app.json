@@ -9,12 +9,12 @@
       "**/*"
     ],
     "scheme": "hamastudio",
-    "icon": "./assets/hime-icon.png",
+    "icon": "./assets/hama-icon.png",
     "android": {
       "package": "com.himestudio.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/hime-icon.png",
+        "foregroundImage": "./assets/hama-icon.png",
         "backgroundColor": "#080507"
       }
     }
