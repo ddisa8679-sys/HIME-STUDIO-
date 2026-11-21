@@ -146,6 +146,8 @@ export default function App() {
           if (profile?.full_name) { setProfileName(profile.full_name); setMasterName(profile.full_name); }
           if (profile?.city_id) setCityId(profile.city_id);
           if (profile?.role === "client" || profile?.role === "master") setRole(profile.role);
+          const { data: ownMaster } = await supabase.from("master_profiles").select("bio,contact_phone,contact_telegram,contact_whatsapp,contact_max,display_name").eq("user_id", session.user.id).maybeSingle();
+          if (ownMaster) { setMasterBio(ownMaster.bio || ""); setMasterName(ownMaster.display_name || profile?.full_name || ""); setMasterPhone(ownMaster.contact_phone || ""); setMasterTelegram(ownMaster.contact_telegram || ""); setMasterWhatsapp(ownMaster.contact_whatsapp || ""); setMasterMax(ownMaster.contact_max || ""); }
         });
       }
     });
