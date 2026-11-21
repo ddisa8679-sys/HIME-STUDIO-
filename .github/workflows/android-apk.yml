@@ -19,8 +19,21 @@ jobs:
         run: npm install
       - name: TypeScript validation
         run: npx tsc --noEmit
+      - name: Regenerate Android app icon PNG
+        run: |
+          set -e
+          npm install --no-save sharp
+          node - <<'JS'
+          const sharp = require("sharp");
+          sharp("assets/hime-icon-premium.svg")
+            .resize(1024, 1024, { fit: "contain", background: "#100a11" })
+            .png({ compressionLevel: 9 })
+            .toFile("assets/hime-icon.png")
+            .then(() => console.log("Generated valid 1024x1024 Android app icon PNG from premium SVG."))
+            .catch((error) => { console.error(error); process.exit(1); });
+          JS
       - name: Generate Android project
-        run: npx expo prebuild --platform android --non-interactive
+        run: npx expo prebuild --platform android
       - name: Configure standalone JavaScript bundle
         run: |
           set -e
