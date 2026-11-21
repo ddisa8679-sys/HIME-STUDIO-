@@ -262,6 +262,22 @@ export default function App() {
       setPostCaption("");
     }
   };
+  const deletePortfolioPost = async (postId: string | number) => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    const { data: item, error: fetchError } = await supabase.from("portfolio_items")
+      .select("media_path").eq("id", postId).eq("master_id", auth.user.id).maybeSingle();
+    if (fetchError || !item) {
+      Alert.alert("Не удалось найти публикацию", fetchError?.message || "Обнови портфолио и попробуй ещё раз.");
+      return;
+    }
+    const { error: deleteError } = await supabase.from("portfolio_items")
+      .delete().eq("id", postId).eq("master_id", auth.user.id);
+    if (deleteError) { Alert.alert("Не удалось удалить публикацию", deleteError.message); return; }
+    const { error: storageError } = await supabase.storage.from("hime-portfolio").remove([item.media_path]);
+    if (storageError) Alert.alert("Публикация удалена", "Запись удалена, но файл не удалось удалить из хранилища: " + storageError.message);
+    setPosts(old => old.filter(post => post.id !== postId));
+  };
   const pickMasterPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { Alert.alert("Нужен доступ к галерее", "Разреши доступ, чтобы выбрать фото профиля."); return; }
@@ -327,7 +343,7 @@ export default function App() {
           <TextInput value={postCaption} onChangeText={setPostCaption} placeholder="Подпись к публикации..." style={[styles.input,styles.multiline]} multiline />
           <Button title="Выбрать фото или видео из галереи" onPress={pickMedia} />
           {posts.length === 0 && <Text style={styles.small}>Публикаций пока нет. Добавь первую работу.</Text>}
-          {posts.map(post=><View key={post.id} style={styles.postCard}>{post.kind === "video" ? <View style={styles.videoTile}><Text style={styles.videoIcon}>▶</Text><Text style={styles.videoLabel}>ВИДЕО РАБОТА</Text></View> : <Image source={{uri:post.uri}} style={styles.postImage} />}<Text style={styles.tag}>{post.kind === "video" ? "ВИДЕО" : "ФОТО"}</Text>{!!post.caption && <Text style={styles.cardTitle}>{post.caption}</Text>}<TouchableOpacity onPress={()=>setPosts(old=>old.filter(x=>x.id!==post.id))} style={styles.deletePost}><Text style={styles.remove}>Удалить работу</Text></TouchableOpacity></View>)}
+          {posts.map(post=><View key={post.id} style={styles.postCard}>{post.kind === "video" ? <View style={styles.videoTile}><Text style={styles.videoIcon}>▶</Text><Text style={styles.videoLabel}>ВИДЕО РАБОТА</Text></View> : <Image source={{uri:post.uri}} style={styles.postImage} />}<Text style={styles.tag}>{post.kind === "video" ? "ВИДЕО" : "ФОТО"}</Text>{!!post.caption && <Text style={styles.cardTitle}>{post.caption}</Text>}<TouchableOpacity onPress={()=>{ void deletePortfolioPost(post.id); }} style={styles.deletePost}><Text style={styles.remove}>Удалить работу</Text></TouchableOpacity></View>)}
         </>}
         {tab === "profile" && <>
           <Text style={styles.kicker}>YOUR HIME PROFILE</Text><Text style={styles.pageTitle}>{isClient ? "Мой профиль" : "Профиль мастера"}</Text>
