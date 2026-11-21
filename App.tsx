@@ -5,6 +5,7 @@ import AuthScreen from "./components/AuthScreen";
 import StudioWorkspace from "./components/StudioWorkspace";
 import AdminWorkspace from "./components/AdminWorkspace";
 import { HeroMascot, NavMascot } from "./components/HimeArtwork";
+import DesignCatalog from "./components/DesignCatalog";
 import { supabase } from "./lib/supabase";
 import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
@@ -403,11 +404,7 @@ export default function App() {
             <Button title="Открыть календарь и записи" onPress={() => setTab("workspace")} /><Button title="Перейти в мой профиль" onPress={() => setTab("profile")} />
           </>}
         </>}
-        {tab === "designs" && <>
-          <Text style={styles.kicker}>NAIL INSPIRATION</Text><Text style={styles.pageTitle}>Каталог дизайнов</Text><Text style={styles.body}>Выбирай идею и сохраняй понравившиеся варианты.</Text>
-          <View style={styles.chips}>{["Все", "Нюд", "Френч", "Яркие", "Бордовые"].map(x => <TouchableOpacity key={x} onPress={() => setSelected(x)} style={[styles.chip, selected === x && styles.chipActive]}><Text style={[styles.chipText, selected === x && styles.chipTextActive]}>{x}</Text></TouchableOpacity>)}</View>
-          {designs.filter(d => selected === "Все" || (selected === "Бордовые" ? d.title.toLowerCase().includes("борд") || d.title.toLowerCase().includes("виш") : d.title.toLowerCase().includes(selected.toLowerCase()))).map((d, i) => <DesignCard key={d.title} item={d} index={i} />)}
-        </>}
+        {tab === "designs" && <DesignCatalog />}
         {tab === "masters" && <>
           <Text style={styles.kicker}>FIND YOUR NAIL ARTIST</Text><Text style={styles.pageTitle}>Каталог мастеров</Text><Text style={styles.body}>Поиск по городу. Смотри портфолио, рейтинг и отзывы перед записью.</Text>
           <TextInput value={query} onChangeText={setQuery} placeholder="Поиск по имени или услуге" style={styles.input} /><Text style={styles.small}>Город каталога: {city}</Text>
