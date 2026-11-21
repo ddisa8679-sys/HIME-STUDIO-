@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "HAMA STUDIO",
-    "slug": "hama-studio",
+    "name": "HIME STUDIO",
+    "slug": "hime-studio",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "assetBundlePatterns": [
       "**/*"
     ],
-    "scheme": "hamastudio",
-    "icon": "./assets/hama-icon.png",
+    "scheme": "himestudio",
+    "icon": "./assets/hime-icon.png",
     "android": {
       "package": "com.himestudio.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/hama-icon.png",
+        "foregroundImage": "./assets/hime-icon.png",
         "backgroundColor": "#080507"
       }
     }
