@@ -141,7 +141,7 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
   };
 
   const requestPromotion = async () => {
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(promotionStart) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(promotionEnd) || promotionEnd < promotionStart) return Alert.alert("Проверь даты", "Укажи период в формате ГГГГ-ММ-ДД, дата окончания не раньше начала.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(promotionStart) || !/^\d{4}-\d{2}-\d{2}$/.test(promotionEnd) || promotionEnd < promotionStart) return Alert.alert("Проверь даты", "Укажи период в формате ГГГГ-ММ-ДД, дата окончания не раньше начала.");
     const { error } = await supabase.from("master_promotions").insert({ master_id: userId, plan: promotionPlan, city, starts_on: promotionStart, ends_on: promotionEnd, status: "pending" });
     if (error) Alert.alert("Не удалось отправить заявку", error.message); else { setPromotionStart(""); setPromotionEnd(""); Alert.alert("Заявка отправлена", "После проверки администрацией продвижение появится в каталоге."); void load(); }
   };
