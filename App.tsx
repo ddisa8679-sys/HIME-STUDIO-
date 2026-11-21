@@ -11,6 +11,7 @@ type Role = "client" | "master";
 type Tab = "home" | "designs" | "masters" | "profile" | "portfolio" | "workspace";
 type Post = { id: string | number; uri: string; kind: string; caption: string };
 type Price = { id: number; title: string; amount: string };
+type BookingService = { id: string; title: string; price: string; duration_minutes: number };
 type City = { id: number; name: string; region: string | null };
 type Master = { user_id: string; name: string; city: string; bio: string; avatar_path: string | null; rating: string; reviews: string; work: string };
 
@@ -51,6 +52,8 @@ export default function App() {
   const [masters, setMasters] = useState<Master[]>([]);
   const [selectedMaster, setSelectedMaster] = useState<Master | null>(null);
   const [masterReviews, setMasterReviews] = useState<any[]>([]);
+  const [bookingServices, setBookingServices] = useState<BookingService[]>([]);
+  const [selectedBookingService, setSelectedBookingService] = useState<BookingService | null>(null);
   const [bookingDays, setBookingDays] = useState<{date:string;label:string;slots:{label:string;iso:string}[]}[]>([]);
   const [selectedBookingSlot, setSelectedBookingSlot] = useState("");
   const [bookingNote, setBookingNote] = useState("");
@@ -124,13 +127,20 @@ export default function App() {
   const openMaster = async (master: Master) => {
     setSelectedMaster(master);
     setMasterReviews([]);
-    const { data, error } = await supabase.from("reviews").select("id,rating,body,created_at").eq("master_id", master.user_id).order("created_at", { ascending: false });
-    if (!error) setMasterReviews(data || []);
+    setBookingServices([]);
+    setSelectedBookingService(null);
+    const [{ data: reviews }, { data: services, error: servicesError }] = await Promise.all([
+      supabase.from("reviews").select("id,rating,body,created_at").eq("master_id", master.user_id).order("created_at", { ascending: false }),
+      supabase.from("master_services").select("id,title,price,duration_minutes").eq("master_id", master.user_id).eq("is_active", true).order("position"),
+    ]);
+    setMasterReviews(reviews || []);
+    if (servicesError) Alert.alert("Не удалось загрузить услуги", servicesError.message);
+    else setBookingServices((services || []).map(s => ({...s,duration_minutes:s.duration_minutes || 60})));
   };
   useEffect(() => {
     let active = true;
     const loadAvailableSlots = async () => {
-      if (!selectedMaster) { setBookingDays([]); setSelectedBookingSlot(""); return; }
+      if (!selectedMaster || !selectedBookingService) { setBookingDays([]); setSelectedBookingSlot(""); return; }
       setBookingDays([]); setSelectedBookingSlot("");
       const start = new Date(); start.setHours(0,0,0,0);
       const end = new Date(start); end.setDate(end.getDate()+14);
@@ -154,11 +164,11 @@ export default function App() {
         if (working && startTime && endTime) {
           const [sh,sm]=String(startTime).slice(0,5).split(":").map(Number); const [eh,em]=String(endTime).slice(0,5).split(":").map(Number);
           const fromMinute=sh*60+sm; const untilMinute=eh*60+em;
-          for(let minute=fromMinute;minute+60<=untilMinute;minute+=30){
+          for(let minute=fromMinute;minute+selectedBookingService.duration_minutes<=untilMinute;minute+=30){
             const slotStart=new Date(day); slotStart.setHours(Math.floor(minute/60),minute%60,0,0);
-            const slotEnd=new Date(slotStart.getTime()+60*60000);
+            const slotEnd=new Date(slotStart.getTime()+selectedBookingService.duration_minutes*60000);
             if(slotStart.getTime()<=Date.now()) continue;
-            const hasBreak=(breaks||[]).some(b=>b.weekday===weekday && minute < (Number(String(b.ends_at).slice(0,2))*60+Number(String(b.ends_at).slice(3,5))) && minute+60 > (Number(String(b.starts_at).slice(0,2))*60+Number(String(b.starts_at).slice(3,5))));
+            const hasBreak=(breaks||[]).some(b=>b.weekday===weekday && minute < (Number(String(b.ends_at).slice(0,2))*60+Number(String(b.ends_at).slice(3,5))) && minute+selectedBookingService.duration_minutes > (Number(String(b.starts_at).slice(0,2))*60+Number(String(b.starts_at).slice(3,5))));
             const hasBooking=(bookings||[]).some(b=>{const bs=new Date(b.starts_at).getTime();const be=b.ends_at?new Date(b.ends_at).getTime():bs+60*60000;return slotStart.getTime()<be && slotEnd.getTime()>bs;});
             if(!hasBreak && !hasBooking) slots.push({label:slotStart.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}),iso:slotStart.toISOString()});
           }
@@ -169,16 +179,17 @@ export default function App() {
     };
     void loadAvailableSlots();
     return ()=>{active=false;};
-  },[selectedMaster]);
+  },[selectedMaster,selectedBookingService]);
 
   const createBooking = async () => {
     if (!selectedMaster) return;
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) { Alert.alert("Нужен вход", "Войди в аккаунт, чтобы записаться."); return; }
+    if (!selectedBookingService) { Alert.alert("Выбери услугу", "Сначала выбери услугу мастера."); return; }
     if (!selectedBookingSlot || new Date(selectedBookingSlot).getTime() <= Date.now()) { Alert.alert("Выбери время", "Сначала выбери свободный интервал в календаре мастера."); return; }
-    const { error } = await supabase.from("bookings").insert({ client_id: auth.user.id, master_id: selectedMaster.user_id, starts_at: selectedBookingSlot, ends_at: new Date(new Date(selectedBookingSlot).getTime()+60*60000).toISOString(), status: "pending", client_note: bookingNote.trim() || null });
+    const { error } = await supabase.from("bookings").insert({ client_id: auth.user.id, master_id: selectedMaster.user_id, service_id: selectedBookingService.id, starts_at: selectedBookingSlot, ends_at: new Date(new Date(selectedBookingSlot).getTime()+selectedBookingService.duration_minutes*60000).toISOString(), status: "pending", client_note: bookingNote.trim() || null });
     if (error) Alert.alert(error.code === "23P01" ? "Это время уже занято" : "Не удалось отправить заявку", error.code === "23P01" ? "Выбери другой свободный интервал." : error.message);
-    else { setSelectedBookingSlot(""); setBookingNote(""); setSelectedMaster(null); Alert.alert("Заявка отправлена", "Мастер сможет подтвердить или отклонить запись в своём кабинете."); }
+    else { setSelectedBookingSlot(""); setSelectedBookingService(null); setBookingNote(""); setSelectedMaster(null); Alert.alert("Заявка отправлена", "Мастер сможет подтвердить или отклонить запись в своём кабинете."); }
   };
 
   useEffect(() => {
@@ -404,7 +415,7 @@ export default function App() {
       <View style={styles.nav}>
         {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["workspace","Кабинет"],["profile","Профиль"]] : [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["workspace","Кабинет"],["profile","Профиль"],["portfolio","Портфолио"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><NavMascot active={tab === key} /><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
-      <Modal visible={!!selectedMaster} animationType="slide" transparent onRequestClose={() => setSelectedMaster(null)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><ScrollView keyboardShouldPersistTaps="handled">{selectedMaster && <><Text style={styles.pageTitle}>{selectedMaster.name}</Text><Text style={styles.small}>{selectedMaster.city}</Text><Text style={styles.stars}>{selectedMaster.rating === "—" ? "Пока без оценок" : "★ "+selectedMaster.rating} · {selectedMaster.reviews}</Text><Text style={styles.sectionTitle}>О мастере</Text><Text style={styles.body}>{selectedMaster.bio || "Мастер пока не добавил описание."}</Text><Text style={styles.sectionTitle}>Услуги</Text><Text style={styles.body}>{selectedMaster.work}</Text><Text style={styles.sectionTitle}>Отзывы клиентов</Text>{masterReviews.length ? masterReviews.map(r => <View key={r.id} style={styles.review}><Text style={styles.stars}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</Text><Text style={styles.small}>{r.body || "Клиент оставил оценку без комментария."}</Text><Text style={styles.small}>{new Date(r.created_at).toLocaleDateString("ru-RU")}</Text></View>) : <Text style={styles.small}>Подтверждённых отзывов пока нет. Здесь будут отображаться только отзывы, привязанные к завершённым записям.</Text>}{role === "client" && <><Text style={styles.sectionTitle}>Свободное время · ближайшие 14 дней</Text><Text style={styles.small}>Длительность записи — 60 минут. В расписании учтены рабочие часы, перерывы, выходные и уже занятые интервалы.</Text>{bookingDays.length ? bookingDays.map(day=><View key={day.date} style={{marginTop:12}}><Text style={styles.cardTitle}>{day.label}</Text><View style={styles.chips}>{day.slots.map(slot=><TouchableOpacity key={slot.iso} onPress={()=>{setSelectedBookingSlot(slot.iso);}} style={[styles.chip,selectedBookingSlot===slot.iso&&styles.chipActive]}><Text style={[styles.chipText,selectedBookingSlot===slot.iso&&styles.chipTextActive]}>{slot.label}</Text></TouchableOpacity>)}</View></View>) : <Text style={styles.small}>Свободных интервалов пока нет или мастер ещё не настроил рабочий график.</Text>}{!!selectedBookingSlot&&<Text style={styles.stars}>Выбрано: {new Date(selectedBookingSlot).toLocaleString("ru-RU")}</Text>}<TextInput value={bookingNote} onChangeText={setBookingNote} placeholder="Комментарий к записи (необязательно)" style={[styles.input,styles.multiline]} multiline/><Button title="Отправить заявку на выбранное время" onPress={() => { void createBooking(); }}/></>}</>}</ScrollView><Button title="Закрыть профиль" secondary onPress={() => setSelectedMaster(null)}/></View></View></Modal>
+      <Modal visible={!!selectedMaster} animationType="slide" transparent onRequestClose={() => setSelectedMaster(null)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><ScrollView keyboardShouldPersistTaps="handled">{selectedMaster && <><Text style={styles.pageTitle}>{selectedMaster.name}</Text><Text style={styles.small}>{selectedMaster.city}</Text><Text style={styles.stars}>{selectedMaster.rating === "—" ? "Пока без оценок" : "★ "+selectedMaster.rating} · {selectedMaster.reviews}</Text><Text style={styles.sectionTitle}>О мастере</Text><Text style={styles.body}>{selectedMaster.bio || "Мастер пока не добавил описание."}</Text><Text style={styles.sectionTitle}>Услуги</Text><Text style={styles.body}>{selectedMaster.work}</Text><Text style={styles.sectionTitle}>Отзывы клиентов</Text>{masterReviews.length ? masterReviews.map(r => <View key={r.id} style={styles.review}><Text style={styles.stars}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</Text><Text style={styles.small}>{r.body || "Клиент оставил оценку без комментария."}</Text><Text style={styles.small}>{new Date(r.created_at).toLocaleDateString("ru-RU")}</Text></View>) : <Text style={styles.small}>Подтверждённых отзывов пока нет. Здесь будут отображаться только отзывы, привязанные к завершённым записям.</Text>}{role === "client" && <><Text style={styles.sectionTitle}>Выбери услугу</Text>{bookingServices.length ? <View style={styles.chips}>{bookingServices.map(service=><TouchableOpacity key={service.id} onPress={()=>{setSelectedBookingService(service);setSelectedBookingSlot("");}} style={[styles.chip,selectedBookingService?.id===service.id&&styles.chipActive]}><Text style={[styles.chipText,selectedBookingService?.id===service.id&&styles.chipTextActive]}>{service.title} · {service.price ? service.price+" ₽" : "цена уточняется"} · {service.duration_minutes} мин</Text></TouchableOpacity>)}</View> : <Text style={styles.small}>У мастера пока нет опубликованных услуг для онлайн-записи.</Text>}{!!selectedBookingService&&<><Text style={styles.sectionTitle}>Свободное время · ближайшие 14 дней</Text><Text style={styles.small}>Длительность: {selectedBookingService.duration_minutes} минут. Учитываются рабочие часы, перерывы, выходные и занятые записи.</Text>{bookingDays.length ? bookingDays.map(day=><View key={day.date} style={{marginTop:12}}><Text style={styles.cardTitle}>{day.label}</Text><View style={styles.chips}>{day.slots.map(slot=><TouchableOpacity key={slot.iso} onPress={()=>setSelectedBookingSlot(slot.iso)} style={[styles.chip,selectedBookingSlot===slot.iso&&styles.chipActive]}><Text style={[styles.chipText,selectedBookingSlot===slot.iso&&styles.chipTextActive]}>{slot.label}</Text></TouchableOpacity>)}</View></View>) : <Text style={styles.small}>Свободных интервалов нет или мастер ещё не настроил рабочий график.</Text>}{!!selectedBookingSlot&&<Text style={styles.stars}>Выбрано: {new Date(selectedBookingSlot).toLocaleString("ru-RU")}</Text>}<TextInput value={bookingNote} onChangeText={setBookingNote} placeholder="Комментарий к записи (необязательно)" style={[styles.input,styles.multiline]} multiline/><Button title="Отправить заявку на выбранное время" onPress={() => { void createBooking(); }}/></>}</>}</>}</ScrollView><Button title="Закрыть профиль" secondary onPress={() => setSelectedMaster(null)}/></View></View></Modal>
       <Modal visible={cityPickerVisible} animationType="slide" transparent onRequestClose={() => setCityPickerVisible(false)}><View style={styles.modalBackdrop}><View style={styles.cityModal}><Text style={styles.sectionTitle}>Выбери город</Text><TextInput value={citySearch} onChangeText={setCitySearch} placeholder="Поиск города или региона" style={styles.input} /><ScrollView keyboardShouldPersistTaps="handled">{cities.filter(x => (x.name+" "+(x.region||"")).toLowerCase().includes(citySearch.toLowerCase())).map(x => <TouchableOpacity key={x.id} style={styles.cityOption} onPress={() => { setCity(x.name); setCityId(x.id); setMasterCity(x.name); setCityPickerVisible(false); setCitySearch(""); }}><Text style={styles.cardTitle}>{x.name}</Text><Text style={styles.small}>{x.region || "Россия"}</Text></TouchableOpacity>)}</ScrollView><Button title="Закрыть" secondary onPress={() => setCityPickerVisible(false)} /></View></View></Modal>
     </SafeAreaView>
   );
