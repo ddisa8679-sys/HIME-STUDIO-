@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "../lib/supabase";
 
 type Role = "client" | "master";
-type Screen = "calendar" | "services" | "tasks" | "bookings" | "favorites" | "notifications" | "settings";
+type Screen = "calendar" | "services" | "waitlist" | "promotions" | "tasks" | "bookings" | "favorites" | "notifications" | "settings";
 type Service = { id: string; title: string; price: string; duration_minutes: number; is_active: boolean; position: number };
 const burgundy = "#651D32";
 const weekdays = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
@@ -20,6 +21,12 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
   const [userId, setUserId] = useState("");
   const [rows, setRows] = useState<any[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [waitlist, setWaitlist] = useState<any[]>([]);
+  const [promotions, setPromotions] = useState<any[]>([]);
+  const [promotionStart, setPromotionStart] = useState("");
+  const [promotionEnd, setPromotionEnd] = useState("");
+  const [promotionPlan, setPromotionPlan] = useState("featured");
+  const [reviewPhoto, setReviewPhoto] = useState<string | null>(null);
   const [serviceTitle, setServiceTitle] = useState("");
   const [servicePrice, setServicePrice] = useState("");
   const [serviceDuration, setServiceDuration] = useState("60");
@@ -50,6 +57,12 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
     } else if (screen === "services") {
       const { data, error } = await supabase.from("master_services").select("id,title,price,duration_minutes,is_active,position").eq("master_id", auth.user.id).order("position");
       if (error) Alert.alert("Не удалось загрузить прайс", error.message); else setServices((data || []) as Service[]);
+    } else if (screen === "waitlist") {
+      const { data, error } = await supabase.from("master_waitlist").select("id,client_id,desired_date,preferred_from,preferred_to,client_note,status,created_at").eq("master_id", auth.user.id).in("status", ["waiting","notified","contacted"]).order("desired_date");
+      if (error) Alert.alert("Не удалось загрузить лист ожидания", error.message); else setWaitlist(data || []);
+    } else if (screen === "promotions") {
+      const { data, error } = await supabase.from("master_promotions").select("id,plan,city,starts_on,ends_on,status,note,created_at").eq("master_id", auth.user.id).order("created_at", { ascending: false });
+      if (error) Alert.alert("Не удалось загрузить продвижение", error.message); else setPromotions(data || []);
     } else if (screen === "tasks") {
       const { data, error } = await supabase.from("master_tasks").select("*").eq("master_id", auth.user.id).order("due_at", { ascending: true });
       if (!error) setTasks(data || []);
@@ -122,6 +135,17 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
     ]);
   };
 
+  const updateWaitlist = async (id: string, status: string) => {
+    const { error } = await supabase.from("master_waitlist").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("master_id", userId);
+    if (error) Alert.alert("Не удалось обновить заявку", error.message); else void load();
+  };
+
+  const requestPromotion = async () => {
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(promotionStart) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(promotionEnd) || promotionEnd < promotionStart) return Alert.alert("Проверь даты", "Укажи период в формате ГГГГ-ММ-ДД, дата окончания не раньше начала.");
+    const { error } = await supabase.from("master_promotions").insert({ master_id: userId, plan: promotionPlan, city, starts_on: promotionStart, ends_on: promotionEnd, status: "pending" });
+    if (error) Alert.alert("Не удалось отправить заявку", error.message); else { setPromotionStart(""); setPromotionEnd(""); Alert.alert("Заявка отправлена", "После проверки администрацией продвижение появится в каталоге."); void load(); }
+  };
+
   const addTask = async () => {
     if (!taskTitle.trim()) return Alert.alert("Нужна задача", "Напиши название задачи.");
     const { error } = await supabase.from("master_tasks").insert({ master_id: userId, title: taskTitle.trim(), due_at: taskDue ? new Date(taskDue).toISOString() : null });
@@ -146,11 +170,25 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
     if (error) Alert.alert("Не удалось перенести запись", error.message); else { setBookingDate(""); Alert.alert("Запись перенесена", "Новое время сохранено."); void load(); }
   };
 
+  const pickReviewPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return Alert.alert("Нужен доступ к галерее", "Разреши доступ, чтобы прикрепить фото результата.");
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.85 });
+    if (!result.canceled && result.assets?.[0]) setReviewPhoto(result.assets[0].uri);
+  };
+
   const submitReview = async (booking: any) => {
     const score = Number(reviewRating);
     if (!Number.isInteger(score) || score < 1 || score > 5) return Alert.alert("Оценка от 1 до 5", "Укажи корректную оценку.");
-    const { error } = await supabase.from("reviews").insert({ booking_id: booking.id, client_id: userId, master_id: booking.master_id, rating: score, body: reviewText.trim() || null });
-    if (error) Alert.alert("Не удалось отправить отзыв", error.message); else { setReviewText(""); Alert.alert("Спасибо за отзыв", "Оценка сохранена."); void load(); }
+    let photoPath: string | null = null;
+    if (reviewPhoto) {
+      const response = await fetch(reviewPhoto); const blob = await response.blob();
+      photoPath = userId + "/review-" + booking.id + "-" + Date.now() + ".jpg";
+      const { error: uploadError } = await supabase.storage.from("hime-review-photos").upload(photoPath, blob, { contentType: "image/jpeg" });
+      if (uploadError) return Alert.alert("Не удалось загрузить фото", uploadError.message);
+    }
+    const { error } = await supabase.from("reviews").insert({ booking_id: booking.id, client_id: userId, master_id: booking.master_id, rating: score, body: reviewText.trim() || null, photo_path: photoPath });
+    if (error) Alert.alert("Не удалось отправить отзыв", error.message); else { setReviewText(""); setReviewPhoto(null); Alert.alert("Спасибо за отзыв", "Оценка и фотография сохранены."); void load(); }
   };
 
   const addDayOff = async () => {
@@ -170,7 +208,7 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
   };
 
   const menu: [Screen, string][] = role === "master"
-    ? [["calendar", "Календарь"], ["services", "Мой прайс"], ["bookings", "Записи"], ["tasks", "Задачи"], ["notifications", "Уведомления"], ["settings", "Настройки"]]
+    ? [["calendar", "Календарь"], ["services", "Мой прайс"], ["waitlist", "Лист ожидания"], ["promotions", "Продвижение"], ["bookings", "Записи"], ["tasks", "Задачи"], ["notifications", "Уведомления"], ["settings", "Настройки"]]
     : [["bookings", "Мои записи"], ["favorites", "Избранное"], ["notifications", "Уведомления"], ["settings", "Настройки"]];
 
   return <View style={s.wrap}>
@@ -200,6 +238,21 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
         </View>)}
         {!services.length && <Text style={s.note}>Прайс пока пуст. Добавь первую услугу выше.</Text>}
       </>}
+      {screen === "waitlist" && role === "master" && <>
+        <Text style={s.title}>Лист ожидания</Text><Text style={s.note}>Когда запись отменяется, клиенты с подходящей датой и временем получают уведомление. Здесь можно обработать заявки.</Text>
+        {waitlist.map(item => <View key={item.id} style={s.card}><Text style={s.cardTitle}>{item.desired_date} · {item.preferred_from?.slice(0,5) || "Любое время"}{item.preferred_to ? "–" + item.preferred_to.slice(0,5) : ""}</Text><Text style={s.note}>Клиент · {item.client_id.slice(0,8)} · {item.status}</Text>{!!item.client_note && <Text style={s.note}>{item.client_note}</Text>}<View style={s.row}><Action title="Связались" secondary onPress={() => void updateWaitlist(item.id,"contacted")}/><Action title="Записан" onPress={() => void updateWaitlist(item.id,"booked")}/></View></View>)}
+        {!waitlist.length && <Text style={s.note}>Пока нет активных заявок в листе ожидания.</Text>}
+      </>}
+      {screen === "promotions" && role === "master" && <>
+        <Text style={s.title}>Продвижение мастера</Text><Text style={s.note}>Отправь заявку на выделение карточки в каталоге. Публикация включается после проверки администратором; оплата внутри приложения пока не подключена.</Text>
+        <Text style={s.heading}>Новая заявка</Text>
+        <View style={s.row}><Action title={promotionPlan === "featured" ? "✓ Выделенная карточка" : "Выделенная карточка"} secondary onPress={() => setPromotionPlan("featured")}/><Action title={promotionPlan === "top" ? "✓ В топе города" : "В топе города"} secondary onPress={() => setPromotionPlan("top")}/></View>
+        <Field value={promotionStart} onChangeText={setPromotionStart} placeholder="Начало: ГГГГ-ММ-ДД"/><Field value={promotionEnd} onChangeText={setPromotionEnd} placeholder="Окончание: ГГГГ-ММ-ДД"/>
+        <Action title="Отправить на модерацию" onPress={() => void requestPromotion()}/>
+        <Text style={s.heading}>Мои заявки</Text>
+        {promotions.map(p => <View key={p.id} style={s.card}><Text style={s.cardTitle}>{p.plan === "top" ? "Топ мастеров города" : "Выделенная карточка"} · {p.city}</Text><Text style={s.note}>{p.starts_on} — {p.ends_on} · {p.status === "pending" ? "На проверке" : p.status === "active" ? "Активно" : p.status === "rejected" ? "Отклонено" : p.status}</Text></View>)}
+        {!promotions.length && <Text style={s.note}>Заявок пока нет.</Text>}
+      </>}
       {screen === "tasks" && role === "master" && <>
         <Text style={s.title}>Мои задачи</Text><Field value={taskTitle} onChangeText={setTaskTitle} placeholder="Например, заказать материалы"/><Field value={taskDue} onChangeText={setTaskDue} placeholder="Срок: 2026-11-25T15:00:00"/><Action title="Добавить задачу" onPress={() => void addTask()}/>
         {tasks.map(t => <TouchableOpacity key={t.id} onPress={() => void markTask(t.id, !t.is_done)} style={s.card}><Text style={s.cardTitle}>{t.is_done ? "✓ " : "○ "}{t.title}</Text>{t.due_at && <Text style={s.note}>{new Date(t.due_at).toLocaleString()}</Text>}</TouchableOpacity>)}
@@ -207,7 +260,7 @@ export default function StudioWorkspace({ role, city, fullName }: { role: Role; 
       </>}
       {screen === "bookings" && <>
         <Text style={s.title}>{role === "master" ? "Записи клиентов" : "История записей"}</Text><Text style={s.note}>Заявки, подтверждения, переносы и отмены.</Text>
-        {rows.map(b => <View key={b.id} style={s.card}><Text style={s.cardTitle}>{new Date(b.starts_at).toLocaleString()}</Text><Text style={s.note}>Статус: {b.status}</Text>{b.client_note && <Text style={s.note}>{b.client_note}</Text>}{role === "master" && <View style={s.row}><Action title="Подтвердить" secondary onPress={() => void updateBooking(b.id,"confirmed")}/><Action title="Завершить" secondary onPress={() => void updateBooking(b.id,"completed")}/><Action title="Отменить" secondary onPress={() => void updateBooking(b.id,"cancelled")}/></View>}{b.status === "confirmed" && <><Field value={bookingDate} onChangeText={setBookingDate} placeholder="Перенос: 2026-11-25T15:00:00+03:00"/><Action title="Перенести запись" secondary onPress={() => void rescheduleBooking(b)}/></>}{role === "client" && b.status === "confirmed" && <Action title="Отменить запись" secondary onPress={() => void updateBooking(b.id,"cancelled")}/ >}{role === "client" && b.status === "completed" && <><Field value={reviewRating} onChangeText={setReviewRating} placeholder="Оценка 1–5"/><Field value={reviewText} onChangeText={setReviewText} placeholder="Твой отзыв"/><Action title="Оставить отзыв" onPress={() => void submitReview(b)}/></>}</View>)}
+        {rows.map(b => <View key={b.id} style={s.card}><Text style={s.cardTitle}>{new Date(b.starts_at).toLocaleString()}</Text><Text style={s.note}>Статус: {b.status}</Text>{b.client_note && <Text style={s.note}>{b.client_note}</Text>}{role === "master" && <View style={s.row}><Action title="Подтвердить" secondary onPress={() => void updateBooking(b.id,"confirmed")}/><Action title="Завершить" secondary onPress={() => void updateBooking(b.id,"completed")}/><Action title="Отменить" secondary onPress={() => void updateBooking(b.id,"cancelled")}/></View>}{b.status === "confirmed" && <><Field value={bookingDate} onChangeText={setBookingDate} placeholder="Перенос: 2026-11-25T15:00:00+03:00"/><Action title="Перенести запись" secondary onPress={() => void rescheduleBooking(b)}/></>}{role === "client" && b.status === "confirmed" && <Action title="Отменить запись" secondary onPress={() => void updateBooking(b.id,"cancelled")}/ >}{role === "client" && b.status === "completed" && <><Field value={reviewRating} onChangeText={setReviewRating} placeholder="Оценка 1–5"/><Field value={reviewText} onChangeText={setReviewText} placeholder="Твой отзыв"/><Action title={reviewPhoto ? "Фото прикреплено ✓" : "Добавить фото результата"} secondary onPress={() => void pickReviewPhoto()}/>{!!reviewPhoto && <Image source={{uri:reviewPhoto}} style={{width:96,height:96,borderRadius:10}}/>}<Action title="Оставить отзыв" onPress={() => void submitReview(b)}/></>}</View>)}
         {!rows.length && <Text style={s.note}>Записей пока нет. Они появятся здесь после оформления через каталог мастеров.</Text>}
       </>}
       {screen === "favorites" && role === "client" && <>
