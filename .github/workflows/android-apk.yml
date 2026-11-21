@@ -77,9 +77,11 @@ jobs:
           }
           EOF
           echo "Kotlin resolution override prepared"
+      - name: Set up Gradle and cache dependencies
+        uses: gradle/actions/setup-gradle@v4
       - name: Build installable APK
         working-directory: android
-        run: ./gradlew -I /tmp/force-kotlin.init.gradle assembleDebug --no-daemon --refresh-dependencies
+        run: ./gradlew -I /tmp/force-kotlin.init.gradle assembleDebug --no-daemon --stacktrace
       - name: Verify APK and embedded JavaScript bundle
         run: |
           set -e
