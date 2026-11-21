@@ -364,7 +364,7 @@ export default function App() {
     if (!result.canceled && result.assets?.[0]) setMasterPhoto(result.assets[0].uri);
   };
 
-  if (!role) return (
+  if (!role && !isAdmin) return (
     <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.welcome}>
         <Text style={styles.brand}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text>
