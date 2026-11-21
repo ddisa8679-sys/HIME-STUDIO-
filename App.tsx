@@ -142,7 +142,7 @@ export default function App() {
       if (event !== "PASSWORD_RECOVERY") setSignedIn(!!session);
       if (!session) { setRole(null); setProfileName(""); }
       else if (event === "SIGNED_IN") {
-        void supabase.from("profiles").select("role, full_name, city_id").eq("user_id", session.user.id).maybeSingle().then(({ data: profile }) => {
+        void supabase.from("profiles").select("role, full_name, city_id").eq("user_id", session.user.id).maybeSingle().then(async ({ data: profile }) => {
           if (profile?.full_name) { setProfileName(profile.full_name); setMasterName(profile.full_name); }
           if (profile?.city_id) setCityId(profile.city_id);
           if (profile?.role === "client" || profile?.role === "master") setRole(profile.role);
