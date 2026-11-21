@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 
 type Role = "client" | "master";
 type Screen = "calendar" | "tasks" | "bookings" | "favorites" | "notifications" | "settings";
-const burgundy = "#651D32";
+const burgundy = "#8F2448";
 const weekdays = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
 
 function Action({ title, onPress, secondary = false }: { title: string; onPress: () => void; secondary?: boolean }) {
