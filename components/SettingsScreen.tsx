@@ -1,74 +1,54 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { supabase } from "../lib/supabase";
 
 type Props = { role: "client" | "master"; onSwitchRole: () => void; onSignOut: () => void };
 const burgundy = "#651D32", ink = "#171316", muted = "#8D8186";
-const languages = ["Русский", "English", "Türkçe", "Español", "Deutsch", "Français", "中文", "Қазақша"];
-
+const languages = [{label:"Русский",value:"ru"},{label:"English",value:"en"},{label:"Türkçe",value:"tr"},{label:"Español",value:"es"},{label:"Deutsch",value:"de"},{label:"Français",value:"fr"},{label:"中文",value:"zh"},{label:"Қазақша",value:"kk"}];
+const detectLanguage = () => { const locale = Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase(); const code = locale.split("-")[0]; return languages.some(x=>x.value===code) ? code : "ru"; };
 function SettingSwitch({ title, detail, value, onValueChange }: { title: string; detail: string; value: boolean; onValueChange: (value: boolean) => void }) {
-  return <View style={styles.settingRow}><View style={styles.copy}><Text style={styles.itemTitle}>{title}</Text><Text style={styles.itemText}>{detail}</Text></View><Switch value={value} onValueChange={onValueChange} trackColor={{ false: "#E6DDE0", true: "#B77A8D" }} thumbColor={value ? burgundy : "#FFF"} /></View>;
+ return <View style={styles.settingRow}><View style={styles.copy}><Text style={styles.itemTitle}>{title}</Text><Text style={styles.itemText}>{detail}</Text></View><Switch value={value} onValueChange={onValueChange} trackColor={{false:"#E6DDE0",true:"#B77A8D"}} thumbColor={value?burgundy:"#FFF"}/></View>;
 }
-function RowAction({ icon, title, detail, onPress, danger = false }: { icon: string; title: string; detail: string; onPress: () => void; danger?: boolean }) {
-  return <TouchableOpacity style={styles.actionRow} onPress={onPress}><View style={[styles.iconBox, danger && styles.dangerBox]}><Text style={[styles.iconText, danger && styles.dangerText]}>{icon}</Text></View><View style={styles.copy}><Text style={[styles.itemTitle, danger && styles.dangerText]}>{title}</Text><Text style={styles.itemText}>{detail}</Text></View><Text style={styles.arrow}>›</Text></TouchableOpacity>;
+function RowAction({icon,title,detail,onPress,danger=false}:{icon:string;title:string;detail:string;onPress:()=>void;danger?:boolean}) {
+ return <TouchableOpacity style={styles.actionRow} onPress={onPress}><View style={[styles.iconBox,danger&&styles.dangerBox]}><Text style={[styles.iconText,danger&&styles.dangerText]}>{icon}</Text></View><View style={styles.copy}><Text style={[styles.itemTitle,danger&&styles.dangerText]}>{title}</Text><Text style={styles.itemText}>{detail}</Text></View><Text style={styles.arrow}>›</Text></TouchableOpacity>;
 }
-export default function SettingsScreen({ role, onSwitchRole, onSignOut }: Props) {
-  const isClient = role === "client";
-  const [bookingAlerts, setBookingAlerts] = useState(true), [messages, setMessages] = useState(true), [reminders, setReminders] = useState(true), [marketing, setMarketing] = useState(false);
-  const [theme, setTheme] = useState("Фирменная"), [compact, setCompact] = useState(false), [language, setLanguage] = useState("Русский"), [languageOpen, setLanguageOpen] = useState(false);
-  const [profilePublic, setProfilePublic] = useState(true), [portfolioPublic, setPortfolioPublic] = useState(true), [showCity, setShowCity] = useState(true);
-  const deleteAccount = () => Alert.alert("Удаление аккаунта", "Удаление аккаунта необратимо. Перед продолжением потребуется подтвердить личность и удалить данные на сервере.", [{ text: "Отмена", style: "cancel" }, { text: "Понятно", style: "destructive", onPress: () => Alert.alert("Нужна серверная настройка", "Самостоятельное удаление пока не подключено. Не удаляй аккаунт через этот экран — сначала подключим безопасный серверный сценарий.") }]);
-  return <ScrollView contentContainerStyle={styles.container}>
-    <Text style={styles.kicker}>HIME STUDIO · PREFERENCES</Text><Text style={styles.title}>Настройки</Text><Text style={styles.description}>Управляй аккаунтом, языком, внешним видом и приватностью.</Text>
-
-    <Text style={styles.section}>Аккаунт</Text><View style={styles.card}>
-      <RowAction icon="♙" title="Тип аккаунта" detail={isClient ? "Клиент" : "Мастер"} onPress={onSwitchRole}/>
-      <View style={styles.separator}/><RowAction icon="◎" title="Личные данные" detail="Имя, город и описание в профиле" onPress={() => Alert.alert("Личные данные", "Изменить имя, город и описание можно в разделе «Профиль».")}/>
-    </View>
-
-    <Text style={styles.section}>Язык приложения</Text><View style={styles.card}>
-      <RowAction icon="文" title="Язык" detail={language} onPress={() => setLanguageOpen(true)}/>
-      <Text style={styles.note}>Популярные языки для пользователей из России и других стран.</Text>
-    </View>
-
-    <Text style={styles.section}>Уведомления</Text><View style={styles.card}>
-      <SettingSwitch title="Записи и изменения" detail="Подтверждения, переносы и отмены" value={bookingAlerts} onValueChange={setBookingAlerts}/><View style={styles.separator}/>
-      <SettingSwitch title="Сообщения" detail="Новые сообщения от клиентов и мастеров" value={messages} onValueChange={setMessages}/><View style={styles.separator}/>
-      <SettingSwitch title="Напоминания" detail="О предстоящей записи" value={reminders} onValueChange={setReminders}/><View style={styles.separator}/>
-      <SettingSwitch title="Новости и предложения" detail="Акции и новости HIME STUDIO" value={marketing} onValueChange={setMarketing}/>
-    </View>
-
-    <Text style={styles.section}>Внешний вид</Text><View style={styles.card}>
-      <Text style={styles.itemTitle}>Тема приложения</Text><Text style={styles.itemText}>Выбери оформление</Text>
-      <View style={styles.choices}>{["Фирменная", "Светлая", "Тёмная"].map(option => <TouchableOpacity key={option} onPress={() => setTheme(option)} style={[styles.themeChoice, theme === option && styles.themeChoiceActive]}><View style={[styles.themeSwatch, option === "Фирменная" ? styles.swatchBrand : option === "Тёмная" ? styles.swatchDark : styles.swatchLight]}/><Text style={[styles.themeText, theme === option && styles.themeTextActive]}>{option}</Text><Text style={styles.themeCheck}>{theme === option ? "✓" : ""}</Text></TouchableOpacity>)}</View>
-      <View style={styles.separator}/><SettingSwitch title="Компактный вид" detail="Больше информации на одном экране" value={compact} onValueChange={setCompact}/>
-    </View>
-
-    <Text style={styles.section}>Конфиденциальность</Text><View style={styles.card}>
-      <SettingSwitch title="Показывать профиль" detail="Разрешить другим пользователям находить профиль" value={profilePublic} onValueChange={setProfilePublic}/><View style={styles.separator}/>
-      <SettingSwitch title="Открытое портфолио" detail="Разрешить просмотр опубликованных работ" value={portfolioPublic} onValueChange={setPortfolioPublic}/><View style={styles.separator}/>
-      <SettingSwitch title="Показывать город" detail="Отображать город в публичном профиле" value={showCity} onValueChange={setShowCity}/>
-      <View style={styles.separator}/><RowAction icon="◇" title="Безопасность аккаунта" detail="Советы по защите учётной записи" onPress={() => Alert.alert("Безопасность", "Используй уникальный пароль и никому не сообщай одноразовые коды.")}/>
-    </View>
-
-    <Text style={styles.section}>Помощь и информация</Text><View style={styles.card}>
-      <RowAction icon="?" title="Помощь и поддержка" detail="Ответы на частые вопросы" onPress={() => Alert.alert("Поддержка", "Контактный канал поддержки нужно подключить отдельно.")}/><View style={styles.separator}/>
-      <RowAction icon="ⓘ" title="О приложении" detail="HIME STUDIO · информация о проекте" onPress={() => Alert.alert("HIME STUDIO", "Платформа для вдохновения, поиска мастеров и записи на маникюр.")}/>
-    </View>
-
-    <Text style={styles.section}>Управление аккаунтом</Text><View style={styles.card}>
-      <RowAction icon="↪" title="Выйти из аккаунта" detail="Завершить текущий сеанс" onPress={onSignOut}/>
-      <View style={styles.separator}/><RowAction icon="⌫" title="Удалить аккаунт" detail="Необратимое удаление профиля и данных" danger onPress={deleteAccount}/>
-    </View>
-    <Text style={styles.footer}>HIME STUDIO · BEAUTY STARTS HERE</Text>
-
-    <Modal visible={languageOpen} transparent animationType="fade" onRequestClose={() => setLanguageOpen(false)}><View style={styles.modalBackdrop}><View style={styles.languageModal}><Text style={styles.modalTitle}>Выбери язык</Text><ScrollView>{languages.map(item => <TouchableOpacity key={item} style={styles.languageOption} onPress={() => { setLanguage(item); setLanguageOpen(false); }}><Text style={styles.languageText}>{item}</Text><Text style={styles.themeCheck}>{language === item ? "✓" : ""}</Text></TouchableOpacity>)}</ScrollView><TouchableOpacity style={styles.closeButton} onPress={() => setLanguageOpen(false)}><Text style={styles.closeText}>Закрыть</Text></TouchableOpacity></View></View></Modal>
-  </ScrollView>;
+export default function SettingsScreen({role,onSwitchRole,onSignOut}:Props) {
+ const [language,setLanguage]=useState(detectLanguage),[languageOpen,setLanguageOpen]=useState(false);
+ const [bookingAlerts,setBookingAlerts]=useState(true),[messages,setMessages]=useState(true),[reminders,setReminders]=useState(true),[marketing,setMarketing]=useState(false);
+ const [theme,setTheme]=useState("brand"),[compact,setCompact]=useState(false),[profilePublic,setProfilePublic]=useState(true),[portfolioPublic,setPortfolioPublic]=useState(true),[showCity,setShowCity]=useState(true),[loaded,setLoaded]=useState(false);
+ const selectedLanguage=languages.find(x=>x.value===language)?.label || "Русский";
+ useEffect(()=>{let active=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user){if(active)setLoaded(true);return;}const {data,error}=await supabase.from("user_preferences").select("*").eq("user_id",user.id).maybeSingle();if(error){Alert.alert("Настройки","Не удалось загрузить сохранённые настройки: "+error.message);if(active)setLoaded(true);return;}if(active&&data){setLanguage(data.preferred_language||detectLanguage());setTheme(data.theme||"brand");setCompact(!!data.compact_mode);setBookingAlerts(data.notify_bookings!==false);setMessages(data.notify_messages!==false);setReminders(data.notify_reminders!==false);setMarketing(!!data.notify_marketing);setProfilePublic(data.is_profile_public!==false);setPortfolioPublic(data.is_portfolio_public!==false);setShowCity(data.show_city!==false);}if(active)setLoaded(true);})();return()=>{active=false;};},[]);
+ const persist=async(patch:Record<string,any>)=>{if(!loaded)return;const {data:{user}}=await supabase.auth.getUser();if(!user){Alert.alert("Нужен вход","Войди в аккаунт, чтобы сохранить настройки.");return;}const {error}=await supabase.from("user_preferences").upsert({user_id:user.id,...patch,updated_at:new Date().toISOString()},{onConflict:"user_id"});if(error)Alert.alert("Не удалось сохранить настройку",error.message);};
+ const setProfileVisibility=async(value:boolean)=>{setProfilePublic(value);await persist({is_profile_public:value});if(role==="master"){const {data:{user}}=await supabase.auth.getUser();if(user){const {error}=await supabase.from("master_profiles").update({is_visible:value}).eq("user_id",user.id);if(error)Alert.alert("Не удалось изменить видимость профиля",error.message);}}};
+ const setPortfolioVisibility=async(value:boolean)=>{setPortfolioPublic(value);await persist({is_portfolio_public:value});if(role==="master"){const {data:{user}}=await supabase.auth.getUser();if(user){const {error}=await supabase.from("portfolio_items").update({is_public:value}).eq("master_id",user.id);if(error)Alert.alert("Не удалось изменить видимость портфолио",error.message);}}};
+ const setCityVisibility=async(value:boolean)=>{setShowCity(value);await persist({show_city:value});if(role==="master"){const {data:{user}}=await supabase.auth.getUser();if(user){const {error}=await supabase.from("master_profiles").update({show_city:value}).eq("user_id",user.id);if(error)Alert.alert("Не удалось изменить видимость города",error.message);}}};
+ const deleteAccount=()=>Alert.alert("Удаление аккаунта","Удаление необратимо. Функция удаления ещё не подключена к защищённой серверной процедуре.",[{text:"Отмена",style:"cancel"},{text:"Понятно",style:"default"}]);
+ const chooseLanguage=async(value:string)=>{setLanguage(value);setLanguageOpen(false);await persist({preferred_language:value});};
+ const chooseTheme=async(value:string)=>{setTheme(value);await persist({theme:value});};
+ const setBoolean=async(setter:(v:boolean)=>void,key:string,value:boolean)=>{setter(value);await persist({[key]:value});};
+ return <ScrollView contentContainerStyle={styles.container}>
+  <Text style={styles.kicker}>HIME STUDIO · PREFERENCES</Text><Text style={styles.title}>Настройки</Text><Text style={styles.description}>Управляй аккаунтом, языком, внешним видом и приватностью.</Text>
+  <Text style={styles.section}>Аккаунт</Text><View style={styles.card}><RowAction icon="♙" title="Тип аккаунта" detail={role==="client"?"Клиент":"Мастер"} onPress={onSwitchRole}/><View style={styles.separator}/><RowAction icon="◎" title="Личные данные" detail="Имя, город и описание в профиле" onPress={()=>Alert.alert("Личные данные","Изменить имя, город и описание можно в разделе «Профиль».")}/></View>
+  <Text style={styles.section}>Язык приложения</Text><View style={styles.card}><RowAction icon="文" title="Язык" detail={selectedLanguage} onPress={()=>setLanguageOpen(true)}/><Text style={styles.note}>При первом запуске язык определяется по настройкам устройства. Выбор сохраняется в аккаунте.</Text></View>
+  <Text style={styles.section}>Уведомления</Text><View style={styles.card}>
+   <SettingSwitch title="Записи и изменения" detail="Подтверждения, переносы и отмены" value={bookingAlerts} onValueChange={v=>void setBoolean(setBookingAlerts,"notify_bookings",v)}/><View style={styles.separator}/>
+   <SettingSwitch title="Сообщения" detail="Новые сообщения от клиентов и мастеров" value={messages} onValueChange={v=>void setBoolean(setMessages,"notify_messages",v)}/><View style={styles.separator}/>
+   <SettingSwitch title="Напоминания" detail="О предстоящей записи" value={reminders} onValueChange={v=>void setBoolean(setReminders,"notify_reminders",v)}/><View style={styles.separator}/>
+   <SettingSwitch title="Новости и предложения" detail="Акции и новости HIME STUDIO" value={marketing} onValueChange={v=>void setBoolean(setMarketing,"notify_marketing",v)}/>
+  </View>
+  <Text style={styles.section}>Внешний вид</Text><View style={styles.card}><Text style={styles.itemTitle}>Тема приложения</Text><Text style={styles.itemText}>Выбери оформление</Text><View style={styles.choices}>{[{label:"Фирменная",value:"brand"},{label:"Светлая",value:"light"},{label:"Тёмная",value:"dark"}].map(x=><TouchableOpacity key={x.value} onPress={()=>void chooseTheme(x.value)} style={[styles.themeChoice,theme===x.value&&styles.themeChoiceActive]}><View style={[styles.themeSwatch,x.value==="brand"?styles.swatchBrand:x.value==="dark"?styles.swatchDark:styles.swatchLight]}/><Text style={[styles.themeText,theme===x.value&&styles.themeTextActive]}>{x.label}</Text><Text style={styles.themeCheck}>{theme===x.value?"✓":""}</Text></TouchableOpacity>)}</View><View style={styles.separator}/><SettingSwitch title="Компактный вид" detail="Больше информации на одном экране" value={compact} onValueChange={v=>void setBoolean(setCompact,"compact_mode",v)}/></View>
+  <Text style={styles.section}>Конфиденциальность</Text><View style={styles.card}>
+   <SettingSwitch title="Показывать профиль" detail="Разрешить другим пользователям находить профиль мастера" value={profilePublic} onValueChange={v=>void setProfileVisibility(v)}/><View style={styles.separator}/>
+   <SettingSwitch title="Открытое портфолио" detail="Разрешить просмотр опубликованных работ" value={portfolioPublic} onValueChange={v=>void setPortfolioVisibility(v)}/><View style={styles.separator}/>
+   <SettingSwitch title="Показывать город" detail="Отображать город в публичном профиле мастера" value={showCity} onValueChange={v=>void setCityVisibility(v)}/><View style={styles.separator}/>
+   <RowAction icon="◇" title="Безопасность аккаунта" detail="Советы по защите учётной записи" onPress={()=>Alert.alert("Безопасность","Используй уникальный пароль и никому не сообщай одноразовые коды.")}/>
+  </View>
+  <Text style={styles.section}>Помощь и информация</Text><View style={styles.card}><RowAction icon="?" title="Помощь и поддержка" detail="Ответы на частые вопросы" onPress={()=>Alert.alert("Поддержка","Контактный канал поддержки нужно подключить отдельно.")}/><View style={styles.separator}/><RowAction icon="ⓘ" title="О приложении" detail="HIME STUDIO · информация о проекте" onPress={()=>Alert.alert("HIME STUDIO","Платформа для вдохновения, поиска мастеров и записи на маникюр.")}/></View>
+  <Text style={styles.section}>Управление аккаунтом</Text><View style={styles.card}><RowAction icon="↪" title="Выйти из аккаунта" detail="Завершить текущий сеанс" onPress={onSignOut}/><View style={styles.separator}/><RowAction icon="⌫" title="Удалить аккаунт" detail="Необратимое удаление профиля и данных" danger onPress={deleteAccount}/></View>
+  <Text style={styles.footer}>HIME STUDIO · BEAUTY STARTS HERE</Text>
+  <Modal visible={languageOpen} transparent animationType="fade" onRequestClose={()=>setLanguageOpen(false)}><View style={styles.modalBackdrop}><View style={styles.languageModal}><Text style={styles.modalTitle}>Выбери язык</Text><ScrollView>{languages.map(item=><TouchableOpacity key={item.value} style={styles.languageOption} onPress={()=>void chooseLanguage(item.value)}><Text style={styles.languageText}>{item.label}</Text><Text style={styles.themeCheck}>{language===item.value?"✓":""}</Text></TouchableOpacity>)}</ScrollView><TouchableOpacity style={styles.closeButton} onPress={()=>setLanguageOpen(false)}><Text style={styles.closeText}>Закрыть</Text></TouchableOpacity></View></View></Modal>
+ </ScrollView>;
 }
-const styles = StyleSheet.create({
- container:{padding:20,paddingBottom:42},kicker:{color:burgundy,fontSize:10,fontWeight:"800",letterSpacing:2.5,marginTop:8},title:{color:ink,fontSize:30,fontWeight:"700",marginTop:8},description:{color:muted,fontSize:13,lineHeight:20,marginTop:8,marginBottom:12},
- section:{color:ink,fontSize:16,fontWeight:"700",marginTop:22,marginBottom:10},card:{backgroundColor:"#FFF",borderRadius:15,borderWidth:1,borderColor:"#EFE5E7",padding:15},settingRow:{flexDirection:"row",alignItems:"center",gap:12,minHeight:48},copy:{flex:1},itemTitle:{color:ink,fontSize:13,fontWeight:"700"},itemText:{color:muted,fontSize:11,lineHeight:17,marginTop:4},note:{color:muted,fontSize:10,lineHeight:16,marginTop:10},
- separator:{height:1,backgroundColor:"#F0E8E9",marginVertical:11},actionRow:{flexDirection:"row",alignItems:"center",gap:11,minHeight:54},iconBox:{width:34,height:34,borderRadius:10,backgroundColor:"#F5ECEE",alignItems:"center",justifyContent:"center"},iconText:{fontSize:17,color:burgundy,fontWeight:"700"},arrow:{fontSize:24,color:burgundy,marginLeft:4},dangerBox:{backgroundColor:"#FBEDEF"},dangerText:{color:"#A32643"},
- choices:{gap:8,marginTop:14},themeChoice:{flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:"#EFE5E7",borderRadius:11,padding:10},themeChoiceActive:{borderColor:burgundy,backgroundColor:"#FBF5F6"},themeSwatch:{width:25,height:25,borderRadius:8},swatchBrand:{backgroundColor:"#651D32"},swatchDark:{backgroundColor:"#171316"},swatchLight:{backgroundColor:"#F4ECEC",borderWidth:1,borderColor:"#E7DADD"},themeText:{color:ink,fontSize:12,flex:1},themeTextActive:{color:burgundy,fontWeight:"700"},themeCheck:{color:burgundy,fontWeight:"800",minWidth:12},
- modalBackdrop:{flex:1,backgroundColor:"rgba(20,10,14,0.5)",justifyContent:"center",padding:24},languageModal:{maxHeight:"75%",backgroundColor:"#FFF",borderRadius:18,padding:18},modalTitle:{color:ink,fontSize:19,fontWeight:"700",marginBottom:12},languageOption:{paddingVertical:14,borderBottomWidth:1,borderColor:"#F0E8E9",flexDirection:"row",justifyContent:"space-between"},languageText:{color:ink,fontSize:14},closeButton:{backgroundColor:burgundy,borderRadius:10,padding:13,alignItems:"center",marginTop:14},closeText:{color:"#FFF",fontWeight:"700"},
- footer:{color:"#A99BA0",fontSize:9,letterSpacing:2,textAlign:"center",marginTop:22}
+const styles=StyleSheet.create({
+ container:{padding:20,paddingBottom:42},kicker:{color:burgundy,fontSize:10,fontWeight:"800",letterSpacing:2.5,marginTop:8},title:{color:ink,fontSize:30,fontWeight:"700",marginTop:8},description:{color:muted,fontSize:13,lineHeight:20,marginTop:8,marginBottom:12},section:{color:ink,fontSize:16,fontWeight:"700",marginTop:22,marginBottom:10},card:{backgroundColor:"#FFF",borderRadius:15,borderWidth:1,borderColor:"#EFE5E7",padding:15},settingRow:{flexDirection:"row",alignItems:"center",gap:12,minHeight:48},copy:{flex:1},itemTitle:{color:ink,fontSize:13,fontWeight:"700"},itemText:{color:muted,fontSize:11,lineHeight:17,marginTop:4},note:{color:muted,fontSize:10,lineHeight:16,marginTop:10},separator:{height:1,backgroundColor:"#F0E8E9",marginVertical:11},actionRow:{flexDirection:"row",alignItems:"center",gap:11,minHeight:54},iconBox:{width:34,height:34,borderRadius:10,backgroundColor:"#F5ECEE",alignItems:"center",justifyContent:"center"},iconText:{fontSize:17,color:burgundy,fontWeight:"700"},arrow:{fontSize:24,color:burgundy,marginLeft:4},dangerBox:{backgroundColor:"#FBEDEF"},dangerText:{color:"#A32643"},choices:{gap:8,marginTop:14},themeChoice:{flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:"#EFE5E7",borderRadius:11,padding:10},themeChoiceActive:{borderColor:burgundy,backgroundColor:"#FBF5F6"},themeSwatch:{width:25,height:25,borderRadius:8},swatchBrand:{backgroundColor:"#651D32"},swatchDark:{backgroundColor:"#171316"},swatchLight:{backgroundColor:"#F4ECEC",borderWidth:1,borderColor:"#E7DADD"},themeText:{color:ink,fontSize:12,flex:1},themeTextActive:{color:burgundy,fontWeight:"700"},themeCheck:{color:burgundy,fontWeight:"800",minWidth:12},modalBackdrop:{flex:1,backgroundColor:"rgba(20,10,14,0.5)",justifyContent:"center",padding:24},languageModal:{maxHeight:"75%",backgroundColor:"#FFF",borderRadius:18,padding:18},modalTitle:{color:ink,fontSize:19,fontWeight:"700",marginBottom:12},languageOption:{paddingVertical:14,borderBottomWidth:1,borderColor:"#F0E8E9",flexDirection:"row",justifyContent:"space-between"},languageText:{color:ink,fontSize:14},closeButton:{backgroundColor:burgundy,borderRadius:10,padding:13,alignItems:"center",marginTop:14},closeText:{color:"#FFF",fontWeight:"700"},footer:{color:"#A99BA0",fontSize:9,letterSpacing:2,textAlign:"center",marginTop:22}
 });
