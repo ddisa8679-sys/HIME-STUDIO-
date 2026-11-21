@@ -10,7 +10,7 @@ const stylesList = ["Френч","Минимализм","Геометрия","Ц
 const finishes = ["Глянцевый","Матовый","С блёстками","Перламутровый","Хром"] as const;
 const lengths = ["Короткие","Средние","Длинные","Очень длинные"] as const;
 const shapes = ["Мягкий квадрат","Миндаль","Овал","Балерина","Стилет"] as const;
-const designs: Design[] = Array.from({length:1000},(_,i)=>{
+const designs: Design[] = Array.from({length:1200},(_,i)=>{
   const p=palettes[i%palettes.length], style=stylesList[Math.floor(i/10)%stylesList.length], finish=finishes[Math.floor(i/100)%finishes.length];
   const length=lengths[Math.floor(i/25)%lengths.length], shape=shapes[Math.floor(i/40)%shapes.length];
   return {id:i+1,title:p[1]+" · "+style.toLowerCase(),color:p[0],colorName:p[1],category:p[2],finish,style,length,shape,accent:["#FFFFFF","#E7B85C","#D8A4B5","#8B5470"][i%4]};
@@ -36,7 +36,7 @@ export default function DesignCatalog() {
   const [showSaved,setShowSaved]=useState(false);
   const filtered=useMemo(()=>designs.filter(d=>(category==="Все" || d.category===category || d.style===category || (category==="Матовые"&&d.finish==="Матовый") || (category==="Глянцевые"&&d.finish==="Глянцевый") || (category==="С блёстками"&&d.finish==="С блёстками"))&&(length==="Любая длина"||d.length===length)&&(!showSaved||saved.includes(d.id))),[category,length,showSaved,saved]);
   return <View style={s.wrap}>
-    <Text style={s.eyebrow}>NAIL INSPIRATION · 1000 ИДЕЙ</Text>
+    <Text style={s.eyebrow}>NAIL INSPIRATION · 1200+ ИДЕЙ</Text>
     <Text style={s.title}>Каталог дизайнов</Text>
     <Text style={s.note}>Подбирай маникюр по настроению, покрытию и длине ногтей.</Text>
     <View style={s.row}><TouchableOpacity onPress={()=>setShowSaved(false)} style={[s.tab,!showSaved&&s.active]}><Text style={[s.tabText,!showSaved&&s.activeText]}>Все дизайны</Text></TouchableOpacity><TouchableOpacity onPress={()=>setShowSaved(true)} style={[s.tab,showSaved&&s.active]}><Text style={[s.tabText,showSaved&&s.activeText]}>♡ Избранное ({saved.length})</Text></TouchableOpacity></View>
@@ -44,7 +44,7 @@ export default function DesignCatalog() {
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>{categories.map(x=><TouchableOpacity key={x} onPress={()=>setCategory(x)} style={[s.chip,category===x&&s.chipOn]}><Text style={[s.chipText,category===x&&s.chipTextOn]}>{x}</Text></TouchableOpacity>)}</ScrollView>
     <Text style={s.label}>Длина ногтей</Text>
     <View style={s.lengths}>{lengthsFilter.map(x=><TouchableOpacity key={x} onPress={()=>setLength(x)} style={[s.lengthChip,length===x&&s.chipOn]}><Text style={[s.chipText,length===x&&s.chipTextOn]}>{x}</Text></TouchableOpacity>)}</View>
-    <Text style={s.count}>Найдено вариантов: {filtered.length} из 1000</Text>
+    <Text style={s.count}>Найдено вариантов: {filtered.length} из {designs.length}</Text>
     <View style={s.grid}>{filtered.slice(0,100).map(item=><View key={item.id} style={s.card}>
       <NailPreview item={item}/>
       <TouchableOpacity onPress={()=>setSaved(old=>old.includes(item.id)?old.filter(x=>x!==item.id):[...old,item.id])} style={s.heart}><Text style={s.heartText}>{saved.includes(item.id)?"♥":"♡"}</Text></TouchableOpacity>
