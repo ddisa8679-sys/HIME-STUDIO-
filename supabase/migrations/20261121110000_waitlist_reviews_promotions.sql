@@ -16,6 +16,16 @@ create table if not exists public.master_waitlist (
 create index if not exists master_waitlist_lookup_idx on public.master_waitlist(master_id, desired_date, status);
 create index if not exists client_waitlist_lookup_idx on public.master_waitlist(client_id, created_at desc);
 
+create table if not exists public.reviews (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid references public.bookings(id) on delete cascade,
+  client_id uuid not null references public.profiles(user_id) on delete cascade,
+  master_id uuid not null references public.master_profiles(user_id) on delete cascade,
+  rating integer not null check (rating between 1 and 5),
+  body text,
+  photo_path text,
+  created_at timestamptz not null default now()
+);
 alter table public.reviews add column if not exists photo_path text;
 create unique index if not exists reviews_one_per_booking_idx on public.reviews(booking_id) where booking_id is not null;
 
@@ -58,7 +68,15 @@ create policy "Masters update own pending promotions" on public.master_promotion
 
 drop policy if exists "Public read reviews" on public.reviews;
 create policy "Public read reviews" on public.reviews for select to anon, authenticated using (true);
-drop policy if exists "Clients create reviews for completed bookings" on public.reviews;
+do $
+declare p record;
+begin
+  for p in select policyname from pg_policies
+    where schemaname = 'public' and tablename = 'reviews' and cmd in ('INSERT','ALL')
+  loop
+    execute format('drop policy %I on public.reviews', p.policyname);
+  end loop;
+end $;
 create policy "Clients create reviews for completed bookings" on public.reviews for insert to authenticated with check (
   auth.uid() = client_id and exists (
     select 1 from public.bookings b
