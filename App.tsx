@@ -3,12 +3,13 @@ import { Image, Alert, Modal } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import AuthScreen from "./components/AuthScreen";
 import StudioWorkspace from "./components/StudioWorkspace";
+import AdminWorkspace from "./components/AdminWorkspace";
 import { HeroMascot, NavMascot } from "./components/HimeArtwork";
 import { supabase } from "./lib/supabase";
 import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 type Role = "client" | "master";
-type Tab = "home" | "designs" | "masters" | "profile" | "portfolio" | "workspace";
+type Tab = "home" | "designs" | "masters" | "profile" | "portfolio" | "workspace" | "admin";
 type Post = { id: string | number; uri: string; kind: string; caption: string };
 type Price = { id: number; title: string; amount: string };
 type BookingService = { id: string; title: string; price: string; duration_minutes: number };
@@ -43,6 +44,7 @@ export default function App() {
   const [role, setRole] = useState<Role | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
   const [city, setCity] = useState("Ногинск");
   const [cityId, setCityId] = useState<number | null>(null);
@@ -219,6 +221,8 @@ export default function App() {
       if (data.session) {
         setSignedIn(true);
         const { data: profile } = await supabase.from("profiles").select("role, full_name, city_id").eq("user_id", data.session.user.id).maybeSingle();
+        const { data: adminMembership } = await supabase.from("hime_admins").select("user_id").eq("user_id", data.session.user.id).maybeSingle();
+        if (alive) setIsAdmin(!!adminMembership);
         if (alive && (profile?.role === "client" || profile?.role === "master")) setRole(profile.role);
         if (alive && profile?.full_name) { setProfileName(profile.full_name); setMasterName(profile.full_name); }
         if (alive && profile?.city_id) setCityId(profile.city_id);
@@ -228,8 +232,9 @@ export default function App() {
     void restore();
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event !== "PASSWORD_RECOVERY") setSignedIn(!!session);
-      if (!session) { setRole(null); setProfileName(""); }
+      if (!session) { setRole(null); setIsAdmin(false); setProfileName(""); }
       else if (event === "SIGNED_IN") {
+        void supabase.from("hime_admins").select("user_id").eq("user_id", session.user.id).maybeSingle().then(({ data }) => setIsAdmin(!!data));
         void supabase.from("profiles").select("role, full_name, city_id").eq("user_id", session.user.id).maybeSingle().then(({ data: profile }) => {
           if (profile?.full_name) { setProfileName(profile.full_name); setMasterName(profile.full_name); }
           if (profile?.city_id) setCityId(profile.city_id);
@@ -378,7 +383,7 @@ export default function App() {
   const title = isClient ? "Найди свой стиль" : "Твоя студия начинается здесь";
   return (
     <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
-      <View style={styles.topbar}><TouchableOpacity onPress={() => setTab("home")}><Text style={styles.back}>‹ Главная</Text></TouchableOpacity><View style={{ alignItems: "center" }}><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.headerName}>{profileName || masterName || "Ваш профиль"}</Text></View><TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View>
+      <View style={styles.topbar}><TouchableOpacity onPress={() => setTab("home")}><Text style={styles.back}>‹ Главная</Text></TouchableOpacity><View style={{ alignItems: "center" }}><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.headerName}>{profileName || masterName || "Ваш профиль"}</Text></View><View style={{flexDirection:"row",alignItems:"center",gap:12}}>{isAdmin && <TouchableOpacity onPress={() => setTab("admin")}><Text style={[styles.roleTag,{color:burgundy}]}>АДМИН</Text></TouchableOpacity>}<TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View></View>
       <ScrollView contentContainerStyle={styles.content}>
         {tab === "home" && <>
           <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
@@ -411,6 +416,7 @@ export default function App() {
         </>}
 
         {tab === "workspace" && <StudioWorkspace role={role} city={city} fullName={profileName || masterName} />}
+        {tab === "admin" && isAdmin && <AdminWorkspace />}
         {tab === "portfolio" && <>
           <Text style={styles.kicker}>MY PORTFOLIO</Text><Text style={styles.pageTitle}>Портфолио работ</Text>
           <Text style={styles.body}>Загружай фотографии и видео. Это витрина твоих работ, без лайков и комментариев.</Text>
