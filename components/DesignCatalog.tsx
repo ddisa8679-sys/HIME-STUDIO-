@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle } from "react-native-svg";
 
 type Design = { id: number; title: string; color: string; colorName: string; category: string; finish: string; style: string; length: string; shape: string; accent: string };
@@ -10,6 +10,7 @@ const stylesList = ["Френч","Минимализм","Геометрия","Ц
 const finishes = ["Глянцевый","Матовый","С блёстками","Перламутровый","Хром"] as const;
 const lengths = ["Короткие","Средние","Длинные","Очень длинные"] as const;
 const shapes = ["Мягкий квадрат","Миндаль","Овал","Балерина","Стилет"] as const;
+const designPhotos: Record<number, string> = {};
 const designs: Design[] = Array.from({length:1200},(_,i)=>{
   const p=palettes[i%palettes.length], style=stylesList[Math.floor(i/10)%stylesList.length], finish=finishes[Math.floor(i/100)%finishes.length];
   const length=lengths[Math.floor(i/25)%lengths.length], shape=shapes[Math.floor(i/40)%shapes.length];
@@ -46,7 +47,7 @@ export default function DesignCatalog() {
     <View style={s.lengths}>{lengthsFilter.map(x=><TouchableOpacity key={x} onPress={()=>setLength(x)} style={[s.lengthChip,length===x&&s.chipOn]}><Text style={[s.chipText,length===x&&s.chipTextOn]}>{x}</Text></TouchableOpacity>)}</View>
     <Text style={s.count}>Найдено вариантов: {filtered.length} из {designs.length}</Text>
     <View style={s.grid}>{filtered.slice(0,100).map(item=><View key={item.id} style={s.card}>
-      <NailPreview item={item}/>
+      {designPhotos[item.id] ? <Image source={{uri:designPhotos[item.id]}} style={{width:"100%",height:170,borderRadius:12}} resizeMode="cover"/> : <NailPreview item={item}/>}
       <TouchableOpacity onPress={()=>setSaved(old=>old.includes(item.id)?old.filter(x=>x!==item.id):[...old,item.id])} style={s.heart}><Text style={s.heartText}>{saved.includes(item.id)?"♥":"♡"}</Text></TouchableOpacity>
       <Text style={s.cardTitle}>{String(item.id).padStart(4,"0")} · {item.title}</Text>
       <Text style={s.meta}>{item.length} · {item.shape}</Text>
