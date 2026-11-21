@@ -82,7 +82,7 @@ export default function App() {
     const loadDirectory = async () => {
       const { data: cityRows } = await supabase.from("cities").select("id,name,region").order("name");
       if (active) setCities((cityRows || []) as City[]);
-      const { data: masterRows } = await supabase.from("master_profiles").select("user_id,display_name,bio,avatar_path").eq("is_visible", true);
+      const { data: masterRows } = await supabase.from("master_profiles").select("user_id,display_name,bio,avatar_path,show_city").eq("is_visible", true);
       if (!masterRows?.length || !active) { if (active) setMasters([]); return; }
       const ids = masterRows.map(m => m.user_id);
       const today = new Date().toISOString().slice(0,10);
@@ -104,8 +104,8 @@ export default function App() {
       (promotions || []).forEach(p => promotionMap.set(p.master_id,p.plan));
       const mapped: Master[] = masterRows.map(m => {
         const ratings = reviewMap.get(m.user_id) || [];
-        return { user_id:m.user_id, name:m.display_name || "Мастер HIME", city:cityMap.get(profileMap.get(m.user_id)?.city_id) || "", bio:m.bio || "", avatar_path:m.avatar_path, rating:ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : "—", reviews:ratings.length ? ratings.length+" отзывов" : "Пока без отзывов", work:(serviceMap.get(m.user_id)||[]).join(" · ") || "Услуги уточняются", promoted:promotionMap.has(m.user_id), promotionPlan:promotionMap.get(m.user_id) };
-      }).filter(m => !!m.city);
+        return { user_id:m.user_id, name:m.display_name || "Мастер HIME", city:m.show_city === false ? "Город скрыт" : (cityMap.get(profileMap.get(m.user_id)?.city_id) || ""), bio:m.bio || "", avatar_path:m.avatar_path, rating:ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : "—", reviews:ratings.length ? ratings.length+" отзывов" : "Пока без отзывов", work:(serviceMap.get(m.user_id)||[]).join(" · ") || "Услуги уточняются", promoted:promotionMap.has(m.user_id), promotionPlan:promotionMap.get(m.user_id) };
+      });
       if (active) setMasters(mapped);
     };
     void loadDirectory();
@@ -113,7 +113,7 @@ export default function App() {
   }, []);
 
 
-  const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>Number(!!b.promoted)-Number(!!a.promoted) || Number(b.promotionPlan === "top")-Number(a.promotionPlan === "top")), [query, city, masters]);
+  const filteredMasters = useMemo(() => masters.filter(m => (m.city === "Город скрыт" || m.city.trim().toLowerCase() === city.trim().toLowerCase()) && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>Number(!!b.promoted)-Number(!!a.promoted) || Number(b.promotionPlan === "top")-Number(a.promotionPlan === "top")), [query, city, masters]);
   useEffect(() => {
     let active = true;
     const loadSaved = async () => {
@@ -337,7 +337,8 @@ export default function App() {
       const path = auth.user.id + "/portfolio-" + Date.now() + "." + extension;
       const { error: uploadError } = await supabase.storage.from("hime-portfolio").upload(path, blob, { contentType: asset.mimeType || (asset.type === "video" ? "video/mp4" : "image/jpeg") });
       if (uploadError) { Alert.alert("Не удалось загрузить работу", uploadError.message); return; }
-      const { data: row, error: insertError } = await supabase.from("portfolio_items").insert({ master_id: auth.user.id, media_path: path, media_type: asset.type === "video" ? "video" : "image", caption: postCaption.trim() }).select("id").single();
+      const { data: prefs } = await supabase.from("user_preferences").select("is_portfolio_public").eq("user_id", auth.user.id).maybeSingle();
+      const { data: row, error: insertError } = await supabase.from("portfolio_items").insert({ master_id: auth.user.id, media_path: path, media_type: asset.type === "video" ? "video" : "image", caption: postCaption.trim(), is_public: prefs?.is_portfolio_public !== false }).select("id").single();
       if (insertError) { Alert.alert("Файл загружен, но публикация не сохранена", insertError.message); return; }
       const publicUrl = supabase.storage.from("hime-portfolio").getPublicUrl(path).data.publicUrl;
       setPosts(old => [{ id: row.id, uri: publicUrl, kind: asset.type || "image", caption: postCaption.trim() }, ...old]);
