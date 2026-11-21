@@ -292,7 +292,7 @@ export default function App() {
       <View style={styles.topbar}><TouchableOpacity onPress={() => setTab("home")}><Text style={styles.back}>‹ Главная</Text></TouchableOpacity><View style={{ alignItems: "center" }}><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.headerName}>{profileName || masterName || "Ваш профиль"}</Text></View><TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View>
       {tab === "chat" ? <View style={{flex:1}}><ChatScreen key={chatConversationId || "inbox"} role={role} initialConversationId={chatConversationId} /></View> : <ScrollView contentContainerStyle={styles.content}>
         {tab === "home" && <>
-          <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
+          <View style={styles.heroArt}><AnimeMascot /><Text style={styles.heroCaption}>HIME BEAUTY CLUB · YOUR MOMENT TO SHINE</Text></View><Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
           <Text style={styles.body}>{isClient ? "Вдохновляйся дизайнами, находи мастеров рядом и выбирай то, что нравится именно тебе." : "Покажи свои работы, расскажи о себе и находи клиентов в своём городе."}</Text>
           {isClient ? <>
             <SectionTitle title="Город" /><TouchableOpacity style={styles.input} onPress={() => setCityPickerVisible(true)}><Text style={{color:city ? ink : muted}}>{city || "Выбери город из списка"}</Text></TouchableOpacity><Text style={styles.small}>Город выбирается из справочника российских городов.</Text>
