@@ -288,9 +288,9 @@ export default function App() {
   };
   const title = isClient ? "Найди свой стиль" : "Твоя студия начинается здесь";
   return (
-    <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.safe}><StatusBar barStyle="light-content" />
       <View style={styles.topbar}><TouchableOpacity onPress={() => setTab("home")}><Text style={styles.back}>‹ Главная</Text></TouchableOpacity><View style={{ alignItems: "center" }}><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.headerName}>{profileName || masterName || "Ваш профиль"}</Text></View><TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View>
-      <ScrollView contentContainerStyle={styles.content}>
+      {tab === "chat" ? <View style={{flex:1}}><ChatScreen key={chatConversationId || "inbox"} role={role} initialConversationId={chatConversationId} /></View> : <ScrollView contentContainerStyle={styles.content}>
         {tab === "home" && <>
           <Text style={styles.kicker}>BEAUTY IN YOUR CITY</Text><Text style={styles.pageTitle}>{title}</Text>
           <Text style={styles.body}>{isClient ? "Вдохновляйся дизайнами, находи мастеров рядом и выбирай то, что нравится именно тебе." : "Покажи свои работы, расскажи о себе и находи клиентов в своём городе."}</Text>
@@ -322,7 +322,6 @@ export default function App() {
         </>}
 
         {tab === "workspace" && <StudioWorkspace role={role} city={city} fullName={profileName || masterName} />}
-        {tab === "chat" && <ChatScreen key={chatConversationId || "inbox"} role={role} initialConversationId={chatConversationId} />}
         {tab === "portfolio" && <>
           <Text style={styles.kicker}>MY PORTFOLIO</Text><Text style={styles.pageTitle}>Портфолио работ</Text>
           <Text style={styles.body}>Загружай фотографии и видео. Это витрина твоих работ, без лайков и комментариев.</Text>
@@ -342,7 +341,7 @@ export default function App() {
           </>}
           <Button title="Сохранить профиль" onPress={() => { void saveProfile(); }} /><SectionTitle title="Настройки аккаунта" /><Text style={styles.small}>Текущая роль: {isClient ? "Клиент" : "Мастер"}. Изменить тип аккаунта можно здесь, в настройках профиля.</Text><Button title={isClient ? "Переключиться на мастера" : "Переключиться на клиента"} secondary onPress={() => { void chooseRole(isClient ? "master" : "client"); }} />
         </>}
-      </ScrollView>
+      </ScrollView>}
       <View style={styles.nav}>
         {(isClient ? [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["chat","Чаты"],["workspace","Кабинет"],["profile","Профиль"]] : [["home","Главная"],["designs","Дизайны"],["masters","Мастера"],["chat","Чаты"],["workspace","Кабинет"],["profile","Профиль"],["portfolio","Портфолио"]]).map(([key, label]) => <TouchableOpacity key={key} onPress={() => { if (key === "chat") setChatConversationId(null); setTab(key as Tab); }} style={styles.navItem}><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
