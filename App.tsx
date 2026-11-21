@@ -97,7 +97,29 @@ export default function App() {
 
 
   const filteredMasters = useMemo(() => masters.filter(m => m.city.trim().toLowerCase() === city.trim().toLowerCase() && (m.name.toLowerCase().includes(query.toLowerCase()) || m.work.toLowerCase().includes(query.toLowerCase()))), [query, city, masters]);
-  const toggleSaved = (name: string) => setSaved(old => old.includes(name) ? old.filter(x => x !== name) : [...old, name]);
+  useEffect(() => {
+    let active = true;
+    const loadSaved = async () => {
+      if (role !== "client" || !signedIn) { setSaved([]); return; }
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data, error } = await supabase.from("favorite_masters").select("master_id").eq("client_id", auth.user.id);
+      if (!error && active) setSaved((data || []).map(row => row.master_id));
+    };
+    void loadSaved();
+    return () => { active = false; };
+  }, [role, signedIn]);
+
+  const toggleSaved = async (masterId: string) => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) { Alert.alert("Нужен вход", "Войди в аккаунт, чтобы сохранять мастеров."); return; }
+    const alreadySaved = saved.includes(masterId);
+    const result = alreadySaved
+      ? await supabase.from("favorite_masters").delete().eq("client_id", auth.user.id).eq("master_id", masterId)
+      : await supabase.from("favorite_masters").insert({ client_id: auth.user.id, master_id: masterId });
+    if (result.error) { Alert.alert("Не удалось обновить избранное", result.error.message); return; }
+    setSaved(old => alreadySaved ? old.filter(id => id !== masterId) : [...old, masterId]);
+  };
   const openMaster = async (master: Master) => {
     setSelectedMaster(master);
     setMasterReviews([]);
@@ -276,7 +298,7 @@ export default function App() {
             <SectionTitle title="Популярные дизайны" action="Все дизайны" />
             {designs.slice(0, 2).map((d, i) => <DesignCard key={d.title} item={d} index={i} />)}
             <SectionTitle title="Мастера рядом" action="Все мастера" />
-            {masters.filter(m => m.city.toLowerCase() === city.toLowerCase()).slice(0, 1).map((m, i) => <MasterCard key={i} item={m} onPress={() => setTab("masters")} />)}
+            {masters.filter(m => m.city.toLowerCase() === city.toLowerCase()).slice(0, 1).map((m, i) => <MasterCard key={i} item={m} onPress={() => { void openMaster(m); }} saved={saved.includes(m.user_id)} onToggleSaved={() => { void toggleSaved(m.user_id); }} />)}
             <Button title="Открыть каталог мастеров" onPress={() => setTab("masters")} /><Button title="Мои записи и избранное" secondary onPress={() => setTab("workspace")} />
           </> : <>
             <View style={styles.masterIntro}><PhotoPlaceholder /><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Твоя страница мастера</Text><Text style={styles.small}>Добавь фото, город и описание, чтобы клиенты могли тебя найти.</Text></View></View>
@@ -294,7 +316,7 @@ export default function App() {
         {tab === "masters" && <>
           <Text style={styles.kicker}>FIND YOUR NAIL ARTIST</Text><Text style={styles.pageTitle}>Каталог мастеров</Text><Text style={styles.body}>Поиск по городу. Смотри портфолио, рейтинг и отзывы перед записью.</Text>
           <TextInput value={query} onChangeText={setQuery} placeholder="Поиск по имени или услуге" style={styles.input} /><Text style={styles.small}>Город каталога: {city}</Text>
-          {filteredMasters.map((m, i) => <MasterCard key={m.user_id} item={m} onPress={() => { void openMaster(m); }} />)}
+          {filteredMasters.map((m, i) => <MasterCard key={m.user_id} item={m} onPress={() => { void openMaster(m); }} saved={saved.includes(m.user_id)} onToggleSaved={() => { void toggleSaved(m.user_id); }} />)}
           {filteredMasters.length === 0 && <Text style={styles.small}>В выбранном городе пока нет мастеров в демонстрационном списке. Другие города не показываются.</Text>}
         </>}
 
@@ -356,9 +378,9 @@ function AnimeMascot() {
 function DesignCard({ item, index }: { item: typeof designs[number]; index: number }) {
   return <View style={styles.designCard}><View style={[styles.designVisual, index % 2 === 0 ? styles.visualDark : styles.visualLight]}><Text style={styles.visualMark}>{item.mark}</Text><Text style={styles.visualLabel}>HIME NAIL DESIGN</Text></View><View style={styles.designInfo}><Text style={styles.tag}>{item.tag}</Text><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.small}>{item.detail}</Text></View></View>;
 }
-function MasterCard({ item, onPress, saved = false }: { item: typeof masters[number]; onPress: () => void; saved?: boolean }) {
+function MasterCard({ item, onPress, saved = false, onToggleSaved }: { item: typeof masters[number]; onPress: () => void; saved?: boolean; onToggleSaved?: () => void }) {
   const avatar = item.avatar_path ? supabase.storage.from("hime-portfolio").getPublicUrl(item.avatar_path).data.publicUrl : null;
-  return <View style={styles.masterCard}><View style={styles.masterRow}>{avatar ? <Image source={{uri:avatar}} style={styles.profileImage} /> : <PhotoPlaceholder />}<View style={{ flex: 1 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.small}>{item.city}</Text><Text style={styles.stars}>{item.rating === "—" ? "Без оценок" : "★ "+item.rating} <Text style={styles.small}>· {item.reviews}</Text></Text></View></View><Text style={styles.small}>{item.work}</Text><Button title="Посмотреть профиль и отзывы" secondary onPress={onPress} /></View>;
+  return <View style={styles.masterCard}><View style={styles.masterRow}>{avatar ? <Image source={{uri:avatar}} style={styles.profileImage} /> : <PhotoPlaceholder />}<View style={{ flex: 1 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.small}>{item.city}</Text><Text style={styles.stars}>{item.rating === "—" ? "Без оценок" : "★ "+item.rating} <Text style={styles.small}>· {item.reviews}</Text></Text></View></View><Text style={styles.small}>{item.work}</Text><Button title="Посмотреть профиль и отзывы" secondary onPress={onPress} />{onToggleSaved && <Button title={saved ? "♥ В избранном · Убрать" : "♡ В избранное"} secondary onPress={onToggleSaved} />}</View>;
 }
 
 const styles = StyleSheet.create({
