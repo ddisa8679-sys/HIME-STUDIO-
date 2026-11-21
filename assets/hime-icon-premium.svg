@@ -1,15 +1,59 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<defs><radialGradient id="b"><stop stop-color="#68223d"/><stop offset="1" stop-color="#100b12"/></radialGradient><linearGradient id="h" x2="1" y2="1"><stop stop-color="#593044"/><stop offset="1" stop-color="#09080d"/></linearGradient><linearGradient id="s" x2=".2" y2="1"><stop stop-color="#ffe5d8"/><stop offset="1" stop-color="#d89b96"/></linearGradient></defs>
-<rect width="512" height="512" rx="112" fill="url(#b)"/><circle cx="256" cy="222" r="180" fill="none" stroke="#d8a8b4" stroke-opacity=".4" stroke-width="2"/>
-<path d="M92 512q18-140 104-160h120q86 20 104 160" fill="#651a35"/>
-<path d="M126 260Q84 50 250 48q188-12 178 220l-38 170-84-62H194l-48 62Z" fill="url(#h)"/>
-<path d="M176 165q8-72 82-72 90 0 92 84l-14 100q-22 64-80 68-58-8-78-68Z" fill="url(#s)"/>
-<path d="M160 177q-8-104 98-118 104-4 122 108-42-28-76-4-52 36-90-8-26 38-54 22Z" fill="url(#h)"/>
-<path d="M194 210q24-24 50 0m32 0q24-24 50 0" fill="none" stroke="#482633" stroke-width="7" stroke-linecap="round"/>
-<ellipse cx="222" cy="226" rx="9" ry="13" fill="#301624"/><ellipse cx="302" cy="226" rx="9" ry="13" fill="#301624"/><circle cx="219" cy="222" r="4" fill="white"/><circle cx="299" cy="222" r="4" fill="white"/>
-<path d="M249 266q8 6 16 0" fill="none" stroke="#b76e79" stroke-width="4" stroke-linecap="round"/>
-<path d="M116 390q42-56 91-62 22-4 32 20l-30 50-72 72Zm280 0q-42-56-91-62-22-4-32 20l30 50 72 72Z" fill="url(#s)"/>
-<path d="M206 350q-12-48 2-64 14-12 22 10l2 42m60 12q12-48-2-64-14-12-22 10l-2 42" fill="url(#s)"/>
-<g fill="#9c3152" stroke="#f8d8d6" stroke-width="3"><path d="M205 295q8-13 16-2l-1 23h-14Z"/><path d="M291 295q8-13 16-2l-1 23h-14Z"/></g>
-<path d="M390 72l12-28 12 28 28 12-28 12-12 28-12-28-28-12Z" fill="#d8b88b"/><text x="256" y="475" text-anchor="middle" font-family="Georgia,serif" font-size="25" letter-spacing="8" fill="#f0d8d6">HIME</text>
+<defs>
+ <radialGradient id="bg" cx="48%" cy="34%" r="75%"><stop stop-color="#68263f"/><stop offset=".58" stop-color="#321522"/><stop offset="1" stop-color="#100a11"/></radialGradient>
+ <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#563044"/><stop offset=".45" stop-color="#21101d"/><stop offset="1" stop-color="#09070c"/></linearGradient>
+ <linearGradient id="skin" x1="0" y1="0" x2=".2" y2="1"><stop stop-color="#ffe9df"/><stop offset=".55" stop-color="#f0c4b8"/><stop offset="1" stop-color="#c98587"/></linearGradient>
+ <linearGradient id="satin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a84b69"/><stop offset="1" stop-color="#4b142d"/></linearGradient>
+ <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f5dfb9"/><stop offset="1" stop-color="#b98a55"/></linearGradient>
+ <filter id="shadow"><feGaussianBlur stdDeviation="8"/></filter>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#bg)"/>
+<circle cx="256" cy="235" r="203" fill="none" stroke="#d7a9b4" stroke-opacity=".38" stroke-width="2"/>
+<circle cx="256" cy="235" r="190" fill="none" stroke="#d7a9b4" stroke-opacity=".14"/>
+<ellipse cx="260" cy="444" rx="165" ry="28" fill="#08060b" opacity=".45" filter="url(#shadow)"/>
+<!-- shoulders and hair silhouette -->
+<path d="M77 512q9-112 82-150 45-24 97-24 106-2 154 53 29 34 34 121Z" fill="url(#satin)"/>
+<path d="M111 333Q64 217 89 113 115 22 252 28q147-1 175 111 23 91-13 207l-47 93-214-4Z" fill="url(#hair)"/>
+<path d="M127 181q-16-112 93-131 100-20 157 48 42 50 23 126-29-44-70-49-55 28-105-3-36 39-98 9Z" fill="#170d18"/>
+<!-- face turned slightly toward hands -->
+<path d="M155 147q22-66 101-67 88 0 113 76l-14 110q-13 79-91 91-71-13-94-86Z" fill="url(#skin)"/>
+<path d="M139 157q13-100 109-117 87-15 132 53-36-13-66 7-44 29-82 1-36 53-93 56Z" fill="url(#hair)"/>
+<path d="M147 163q-12 92 29 161-46-23-58-94l8-78Z" fill="#180d19"/>
+<path d="M345 132q40 78 9 176-9 31-35 50 42-9 64-65l-4-117Z" fill="#180d19"/>
+<!-- brows and eyes looking down -->
+<path d="M181 211q25-18 48-2m34-2q26-18 51 0" fill="none" stroke="#482434" stroke-width="8" stroke-linecap="round"/>
+<path d="M185 229q22 22 44 4m39-2q22 20 43-2" fill="none" stroke="#4a2634" stroke-width="5" stroke-linecap="round"/>
+<ellipse cx="207" cy="234" rx="8" ry="10" fill="#281421"/><ellipse cx="286" cy="233" rx="8" ry="10" fill="#281421"/>
+<circle cx="204" cy="230" r="3.2" fill="#fff"/><circle cx="283" cy="229" r="3.2" fill="#fff"/>
+<path d="M245 251q-2 13 8 15" fill="none" stroke="#c98788" stroke-width="4" stroke-linecap="round"/>
+<path d="M230 283q23 13 44-2" fill="none" stroke="#a65368" stroke-width="4" stroke-linecap="round"/>
+<ellipse cx="178" cy="263" rx="17" ry="8" fill="#e58f9a" opacity=".25"/><ellipse cx="320" cy="260" rx="17" ry="8" fill="#e58f9a" opacity=".25"/>
+<!-- flowing hair highlights -->
+<path d="M116 120q18-68 94-82m140 13q53 30 65 91M111 211q-2 76 25 123m260-106q4 72-29 125" fill="none" stroke="#81536a" stroke-width="5" stroke-linecap="round" opacity=".62"/>
+<path d="M145 88q40-46 89-43m129 41q26 28 31 56" fill="none" stroke="#b27a8d" stroke-width="2.5" opacity=".6"/>
+<!-- arms lifted to inspect manicure -->
+<path d="M103 438q23-65 69-86 26-12 48 8l43 55-39 46q-44-26-82 15Z" fill="url(#skin)"/>
+<path d="M409 438q-23-65-69-86-26-12-48 8l-43 55 39 46q44-26 82 15Z" fill="url(#skin)"/>
+<path d="M177 365q31-24 55-7 20 14 37 43l-22 31q-34-28-71-22Z" fill="url(#skin)"/>
+<path d="M335 365q-31-24-55-7-20 14-37 43l22 31q34-28 71-22Z" fill="url(#skin)"/>
+<!-- fingers and nails -->
+<g fill="url(#skin)" stroke="#d99d99" stroke-width="2">
+ <path d="M201 401q-8-43 7-53 11-5 16 10l8 42q-12 18-31 1Z"/>
+ <path d="M224 393q-4-48 12-53 13-2 15 15l2 42q-12 17-29-4Z"/>
+ <path d="M246 393q1-45 16-48 13 1 11 17l-4 39q-14 13-23-8Z"/>
+ <path d="M311 401q8-43-7-53-11-5-16 10l-8 42q12 18 31 1Z"/>
+ <path d="M288 393q4-48-12-53-13-2-15 15l-2 42q12 17 29-4Z"/>
+ <path d="M266 393q-1-45-16-48-13 1-11 17l4 39q14 13 23-8Z"/>
+</g>
+<g fill="#8f294d" stroke="#f7d9d5" stroke-width="2">
+ <path d="M207 351q9-10 16 1l3 12-18 3Z"/><path d="M237 344q10-9 16 3l1 13-18 1Z"/><path d="M258 346q11-7 16 5l-2 13-18-2Z"/>
+ <path d="M289 351q-9-10-16 1l-3 12 18 3Z"/><path d="M259 344q-10-9-16 3l-1 13 18 1Z"/><path d="M238 346q-11-7-16 5l2 13 18-2Z"/>
+</g>
+<g fill="none" stroke="#e8b6bd" stroke-width="2" opacity=".85"><path d="M213 354l4 6m25-9 4 7m21-6-4 7m31-5-4 6"/></g>
+<!-- jewelry and signature -->
+<path d="M153 330q14 17 29 16" fill="none" stroke="url(#gold)" stroke-width="4"/>
+<circle cx="176" cy="349" r="6" fill="url(#gold)"/>
+<path d="M379 80l10-24 10 24 24 10-24 10-10 24-10-24-24-10Z" fill="url(#gold)"/>
+<path d="M256 458v19m-25-9h50" stroke="#d7a9b4" stroke-opacity=".65" stroke-width="2"/>
+<text x="256" y="500" text-anchor="middle" font-family="Georgia,serif" font-size="21" letter-spacing="9" fill="#f2dadd">HIME</text>
 </svg>
