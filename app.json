@@ -4,7 +4,7 @@
     "slug": "hime-studio",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -15,7 +15,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/hime-icon.png",
-        "backgroundColor": "#10090D"
+        "backgroundColor": "#FAF4F4"
       }
     }
   }

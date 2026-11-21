@@ -144,28 +144,28 @@ export default function AuthScreen() {
 
 function Field(props: any) {
   const { label, ...inputProps } = props;
-  return <View style={s.field}><Text style={s.label}>{label}</Text><TextInput {...inputProps} style={s.input} placeholderTextColor="#9E7F8A" autoCorrect={false} /></View>;
+  return <View style={s.field}><Text style={s.label}>{label}</Text><TextInput {...inputProps} style={s.input} placeholderTextColor="#A99BA0" autoCorrect={false} /></View>;
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#10090D" },
+  safe: { flex: 1, backgroundColor: "#FAF7F6" },
   container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 26, paddingVertical: 34 },
-  brand: { fontSize: 23, letterSpacing: 5, fontWeight: "800", color: "#F8EEF2" },
+  brand: { fontSize: 23, letterSpacing: 5, fontWeight: "800", color: "#171316" },
   accent: { color: "#651D32" },
-  kicker: { color: "#D18BA2", letterSpacing: 3, fontSize: 9, fontWeight: "800", marginTop: 9 },
+  kicker: { color: "#8D6874", letterSpacing: 3, fontSize: 9, fontWeight: "800", marginTop: 9 },
   ornament: { height: 112, borderRadius: 16, backgroundColor: "#F0E5E7", alignItems: "center", justifyContent: "center", marginTop: 28, marginBottom: 26 },
   flower: { color: "#651D32", fontSize: 58 },
-  heading: { color: "#F8EEF2", fontSize: 29, fontWeight: "700" },
-  description: { color: "#C4AAB5", fontSize: 13, lineHeight: 19, marginTop: 7, marginBottom: 20 },
+  heading: { color: "#171316", fontSize: 29, fontWeight: "700" },
+  description: { color: "#8D8186", fontSize: 13, lineHeight: 19, marginTop: 7, marginBottom: 20 },
   field: { marginBottom: 13 },
-  label: { color: "#F1DFE7", fontWeight: "700", fontSize: 11, marginBottom: 7 },
-  input: { backgroundColor: "#21121A", borderWidth: 1, borderColor: "#512437", borderRadius: 11, paddingHorizontal: 14, paddingVertical: 14, fontSize: 14, color: "#F8EEF2" },
+  label: { color: "#3A3034", fontWeight: "700", fontSize: 11, marginBottom: 7 },
+  input: { backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E9DFE1", borderRadius: 11, paddingHorizontal: 14, paddingVertical: 14, fontSize: 14, color: "#171316" },
   primary: { backgroundColor: "#651D32", borderRadius: 12, padding: 16, alignItems: "center", marginTop: 7 },
-  primaryText: { color: "#21121A", fontSize: 14, fontWeight: "700" },
+  primaryText: { color: "#FFF", fontSize: 14, fontWeight: "700" },
   linkButton: { alignItems: "center", padding: 13 },
   link: { color: "#651D32", fontWeight: "700", fontSize: 12 },
   bottom: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 20 },
-  bottomText: { color: "#C4AAB5", fontSize: 12 },
+  bottomText: { color: "#8D8186", fontSize: 12 },
   notice: { color: "#651D32", backgroundColor: "#F0E5E7", padding: 12, borderRadius: 9, fontSize: 12, lineHeight: 18, marginBottom: 10 },
-  foot: { textAlign: "center", color: "#9E7F8A", fontSize: 9, letterSpacing: 1, marginTop: 30 },
+  foot: { textAlign: "center", color: "#A99BA0", fontSize: 9, letterSpacing: 1, marginTop: 30 },
 });
