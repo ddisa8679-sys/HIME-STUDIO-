@@ -2,6 +2,8 @@ name: Android APK
 on:
   workflow_dispatch:
   push:
+    branches: [main, "feature/**"]
+  pull_request:
     branches: [main]
 jobs:
   build:
@@ -20,7 +22,7 @@ jobs:
       - name: TypeScript validation
         run: npx tsc --noEmit
       - name: Generate Android project
-        run: npx expo prebuild --platform android --non-interactive
+        run: CI=1 npx expo prebuild --platform android
       - name: Configure standalone JavaScript bundle
         run: |
           set -e
