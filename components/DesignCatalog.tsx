@@ -1,60 +1,112 @@
-import React, { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
-import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle } from "react-native-svg";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { supabase } from "../lib/supabase";
 
-type Design = { id: number; title: string; color: string; colorName: string; category: string; finish: string; style: string; length: string; shape: string; accent: string };
-const palettes = [
-  ["#F5C4D0","Розовый","Светлые"],["#F4E6D2","Молочный","Светлые"],["#7A1838","Вишнёвый","Тёмные"],["#D92D55","Красный","Яркие"],["#F5A623","Оранжевый","Яркие"],["#9D83C7","Лавандовый","Пастельные"],["#6C8B72","Шалфейный","Пастельные"],["#3B2638","Сливовый","Тёмные"],["#D9B58C","Бежевый","Нюд"],["#F1A8B8","Пудровый","Нюд"]
-] as const;
-const stylesList = ["Френч","Минимализм","Геометрия","Цветы","Стразы","Градиент","Абстракция","Хром","Мрамор","Однотонный"] as const;
-const finishes = ["Глянцевый","Матовый","С блёстками","Перламутровый","Хром"] as const;
-const lengths = ["Короткие","Средние","Длинные","Очень длинные"] as const;
-const shapes = ["Мягкий квадрат","Миндаль","Овал","Балерина","Стилет"] as const;
-const designPhotos: Record<number, string> = {};
-const designs: Design[] = Array.from({length:1200},(_,i)=>{
-  const p=palettes[i%palettes.length], style=stylesList[Math.floor(i/10)%stylesList.length], finish=finishes[Math.floor(i/100)%finishes.length];
-  const length=lengths[Math.floor(i/25)%lengths.length], shape=shapes[Math.floor(i/40)%shapes.length];
-  return {id:i+1,title:p[1]+" · "+style.toLowerCase(),color:p[0],colorName:p[1],category:p[2],finish,style,length,shape,accent:["#FFFFFF","#E7B85C","#D8A4B5","#8B5470"][i%4]};
-});
-const categories=["Все","Яркие","Светлые","Тёмные","Нюд","Пастельные","Френч","Минимализм","Геометрия","Цветы","Стразы","Градиент","Хром","Матовые","Глянцевые","С блёстками"];
-const lengthsFilter=["Любая длина",...lengths];
-function NailPreview({item}:{item:Design}) {
-  const ids=[0,1,2,3,4];
-  return <Svg viewBox="0 0 320 190" width="100%" height="170">
-    <Defs><LinearGradient id={"bg"+item.id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#FFF9F7"/><Stop offset="1" stopColor="#F1E5E7"/></LinearGradient><LinearGradient id={"pol"+item.id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".65"/><Stop offset=".35" stopColor={item.color}/><Stop offset="1" stopColor={item.color}/></LinearGradient></Defs>
-    <Rect width="320" height="190" rx="18" fill={"url(#bg"+item.id+")"}/>
-    {ids.map((n)=><Path key={n} d={item.length==="Очень длинные"?"M"+(35+n*52)+" 132 Q"+(30+n*52)+" 83 "+(42+n*52)+" 26 Q"+(48+n*52)+" 10 "+(54+n*52)+" 26 Q"+(65+n*52)+" 83 "+(61+n*52)+" 132 Q"+(48+n*52)+" 151 "+(35+n*52)+" 132Z":"M"+(35+n*52)+" 132 Q"+(29+n*52)+" 82 "+(39+n*52)+" 46 Q"+(48+n*52)+" 31 "+(57+n*52)+" 46 Q"+(66+n*52)+" 82 "+(61+n*52)+" 132 Q"+(48+n*52)+" 148 "+(35+n*52)+" 132Z"} fill={"url(#pol"+item.id+")"} stroke="#D9BFC5" strokeWidth="1.2"/>)}
-    {item.style==="Френч" && ids.map(n=><Path key={"f"+n} d={"M"+(37+n*52)+" 54 Q"+(48+n*52)+" 44 "+(59+n*52)+" 54"} fill="none" stroke="#FFF" strokeWidth="7" strokeLinecap="round"/>)}
-    {item.style==="Стразы" && ids.map(n=><Circle key={"s"+n} cx={48+n*52} cy="83" r="4" fill={item.accent} stroke="#FFF" strokeWidth="1"/>)}
-    {item.style==="Цветы" && ids.map(n=><><Circle key={"c"+n} cx={48+n*52} cy="82" r="5" fill={item.accent}/><Circle key={"d"+n} cx={48+n*52} cy="75" r="3" fill="#FFF"/></>)}
-    {item.finish==="С блёстками" && ids.map(n=><Path key={"g"+n} d={"M"+(43+n*52)+" 66 l3 -5 l3 5 l-3 5Z"} fill="#FFF" opacity=".9"/>)}
-  </Svg>;
-}
+type NailDesign = {
+  id: string; title: string; category: string; color: string | null;
+  nail_shape: string | null; nail_length: string | null; finish: string | null;
+  image_path: string; thumbnail_path: string | null;
+};
+const PAGE_SIZE = 24;
+const categories = ["Все", "Френч", "Нюд", "Бордовый", "Красный", "Свадебный", "Минимализм", "Геометрия", "Цветы", "Стразы", "Хром", "Градиент", "Мрамор", "Яркий"];
+
 export default function DesignCatalog() {
-  const [category,setCategory]=useState("Все");
-  const [length,setLength]=useState("Любая длина");
-  const [saved,setSaved]=useState<number[]>([]);
-  const [showSaved,setShowSaved]=useState(false);
-  const filtered=useMemo(()=>designs.filter(d=>(category==="Все" || d.category===category || d.style===category || (category==="Матовые"&&d.finish==="Матовый") || (category==="Глянцевые"&&d.finish==="Глянцевый") || (category==="С блёстками"&&d.finish==="С блёстками"))&&(length==="Любая длина"||d.length===length)&&(!showSaved||saved.includes(d.id))),[category,length,showSaved,saved]);
+  const [items, setItems] = useState<NailDesign[]>([]);
+  const [category, setCategory] = useState("Все");
+  const [search, setSearch] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState<string[]>([]);
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [selected, setSelected] = useState<NailDesign | null>(null);
+
+  const load = useCallback(async (reset = false) => {
+    if (!supabase || loading) return;
+    setLoading(true); setError("");
+    const from = reset ? 0 : offset;
+    let request = supabase.from("nail_designs")
+      .select("id,title,category,color,nail_shape,nail_length,finish,image_path,thumbnail_path")
+      .eq("is_active", true).order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (category !== "Все") request = request.eq("category", category);
+    if (search.trim()) request = request.ilike("title", "%" + search.trim() + "%");
+    const { data, error: queryError } = await request;
+    if (queryError) setError("Не удалось загрузить каталог: " + queryError.message);
+    else {
+      const rows = (data || []) as NailDesign[];
+      setItems(old => reset ? rows : [...old, ...rows]);
+      setOffset(from + rows.length);
+      setHasMore(rows.length === PAGE_SIZE);
+    }
+    setLoading(false);
+  }, [category, search, offset, loading]);
+
+  useEffect(() => { setItems([]); setOffset(0); setHasMore(true); void load(true); }, [category, search]);
+
+  const publicUrl = (path: string) => supabase?.storage.from("nail-designs").getPublicUrl(path).data.publicUrl || "";
+  const visibleItems = savedOnly ? items.filter(x => saved.includes(x.id)) : items;
+
   return <View style={s.wrap}>
-    <Text style={s.eyebrow}>NAIL INSPIRATION · 1200+ ИДЕЙ</Text>
+    <Text style={s.eyebrow}>HIME STUDIO · INSPIRATION</Text>
     <Text style={s.title}>Каталог дизайнов</Text>
-    <Text style={s.note}>Подбирай маникюр по настроению, покрытию и длине ногтей.</Text>
-    <View style={s.row}><TouchableOpacity onPress={()=>setShowSaved(false)} style={[s.tab,!showSaved&&s.active]}><Text style={[s.tabText,!showSaved&&s.activeText]}>Все дизайны</Text></TouchableOpacity><TouchableOpacity onPress={()=>setShowSaved(true)} style={[s.tab,showSaved&&s.active]}><Text style={[s.tabText,showSaved&&s.activeText]}>♡ Избранное ({saved.length})</Text></TouchableOpacity></View>
-    <Text style={s.label}>Цвет и стиль</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>{categories.map(x=><TouchableOpacity key={x} onPress={()=>setCategory(x)} style={[s.chip,category===x&&s.chipOn]}><Text style={[s.chipText,category===x&&s.chipTextOn]}>{x}</Text></TouchableOpacity>)}</ScrollView>
-    <Text style={s.label}>Длина ногтей</Text>
-    <View style={s.lengths}>{lengthsFilter.map(x=><TouchableOpacity key={x} onPress={()=>setLength(x)} style={[s.lengthChip,length===x&&s.chipOn]}><Text style={[s.chipText,length===x&&s.chipTextOn]}>{x}</Text></TouchableOpacity>)}</View>
-    <Text style={s.count}>Найдено вариантов: {filtered.length} из {designs.length}</Text>
-    <View style={s.grid}>{filtered.slice(0,100).map(item=><View key={item.id} style={s.card}>
-      {designPhotos[item.id] ? <Image source={{uri:designPhotos[item.id]}} style={{width:"100%",height:170,borderRadius:12}} resizeMode="cover"/> : <NailPreview item={item}/>}
-      <TouchableOpacity onPress={()=>setSaved(old=>old.includes(item.id)?old.filter(x=>x!==item.id):[...old,item.id])} style={s.heart}><Text style={s.heartText}>{saved.includes(item.id)?"♥":"♡"}</Text></TouchableOpacity>
-      <Text style={s.cardTitle}>{String(item.id).padStart(4,"0")} · {item.title}</Text>
-      <Text style={s.meta}>{item.length} · {item.shape}</Text>
-      <Text style={s.meta}>{item.finish} · {item.style}</Text>
-    </View>)}</View>
-    {filtered.length>100&&<Text style={s.more}>Показаны первые 100 вариантов из подходящих. Уточни фильтры, чтобы быстрее найти идею.</Text>}
-    {filtered.length===0&&<Text style={s.note}>Пока нет сохранённых дизайнов в этой подборке.</Text>}
+    <Text style={s.note}>Фотографии реальных дизайнов. Загружаются частями, чтобы каталог работал плавно.</Text>
+    <TextInput value={search} onChangeText={setSearch} placeholder="Поиск дизайна" placeholderTextColor="#A9959C" style={s.search}/>
+    <View style={s.row}>
+      <TouchableOpacity onPress={()=>setSavedOnly(false)} style={[s.tab,!savedOnly&&s.active]}><Text style={s.tabText}>Все дизайны</Text></TouchableOpacity>
+      <TouchableOpacity onPress={()=>setSavedOnly(true)} style={[s.tab,savedOnly&&s.active]}><Text style={s.tabText}>♡ Избранное ({saved.length})</Text></TouchableOpacity>
+    </View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
+      {categories.map(x=><TouchableOpacity key={x} onPress={()=>setCategory(x)} style={[s.chip,category===x&&s.chipOn]}><Text style={s.chipText}>{x}</Text></TouchableOpacity>)}
+    </ScrollView>
+    {error ? <Text style={s.error}>{error}</Text> : null}
+    {selected ? <View style={s.viewer}>
+      <TouchableOpacity onPress={()=>setSelected(null)}><Text style={s.close}>‹ Назад к каталогу</Text></TouchableOpacity>
+      <Image source={{uri:publicUrl(selected.image_path)}} style={s.fullImage} resizeMode="contain"/>
+      <Text style={s.cardTitle}>{selected.title}</Text>
+      <Text style={s.meta}>{[selected.category,selected.nail_shape,selected.nail_length,selected.finish].filter(Boolean).join(" · ")}</Text>
+    </View> : <>
+      <View style={s.grid}>{visibleItems.map(item=><View key={item.id} style={s.card}>
+        <TouchableOpacity onPress={()=>setSelected(item)}>
+          <Image source={{uri:publicUrl(item.thumbnail_path || item.image_path)}} style={s.photo} resizeMode="cover"/>
+          <Text style={s.cardTitle}>{item.title}</Text>
+          <Text style={s.meta}>{[item.nail_shape,item.nail_length,item.finish].filter(Boolean).join(" · ")}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={()=>setSaved(old=>old.includes(item.id)?old.filter(x=>x!==item.id):[...old,item.id])} style={s.heart}><Text style={s.heartText}>{saved.includes(item.id)?"♥":"♡"}</Text></TouchableOpacity>
+      </View>)}</View>
+      {!loading && visibleItems.length===0 && <Text style={s.empty}>{savedOnly ? "Ты пока не добавила дизайны в избранное." : "Фотографии ещё не загружены. Каталог и фильтры уже подключены; фотоколлекцию нужно наполнить файлами с подтверждённой лицензией."}</Text>}
+      {loading && <ActivityIndicator color="#C34A68" style={{margin:18}}/>}
+      {!loading && hasMore && !savedOnly && <TouchableOpacity style={s.moreButton} onPress={()=>void load()}><Text style={s.moreText}>Загрузить ещё</Text></TouchableOpacity>}
+    </>}
   </View>;
 }
-const s=StyleSheet.create({wrap:{gap:12,backgroundColor:"#090607",padding:12,borderRadius:20},eyebrow:{fontSize:10,letterSpacing:2,color:"#C34A68",fontWeight:"800"},title:{fontSize:28,fontWeight:"800",color:"#FFF5F6"},note:{fontSize:13,lineHeight:20,color:"#B9A6AC"},row:{flexDirection:"row",gap:8,flexWrap:"wrap"},tab:{paddingVertical:10,paddingHorizontal:14,borderRadius:20,backgroundColor:"#211317",borderWidth:1,borderColor:"#392129"},active:{backgroundColor:"#70152D",borderColor:"#A92D4D"},tabText:{fontSize:12,color:"#C8B7BC",fontWeight:"700"},activeText:{color:"#FFF"},label:{fontSize:12,fontWeight:"800",color:"#F1E4E8",marginTop:4},chips:{gap:7,paddingVertical:3},chip:{paddingVertical:8,paddingHorizontal:12,borderRadius:18,backgroundColor:"#211317",borderWidth:1,borderColor:"#392129"},chipOn:{backgroundColor:"#78172F",borderColor:"#B53656"},chipText:{fontSize:11,color:"#D4C2C7"},chipTextOn:{color:"#FFF",fontWeight:"700"},lengths:{flexDirection:"row",flexWrap:"wrap",gap:7},lengthChip:{paddingVertical:8,paddingHorizontal:10,borderRadius:16,backgroundColor:"#211317",borderWidth:1,borderColor:"#392129"},count:{fontSize:11,color:"#B49EA5",fontWeight:"700"},grid:{flexDirection:"row",flexWrap:"wrap",gap:10},card:{width:"48%",backgroundColor:"#160D10",borderRadius:16,padding:8,borderWidth:1,borderColor:"#43212D",overflow:"hidden"},heart:{position:"absolute",top:12,right:12,width:30,height:30,borderRadius:15,backgroundColor:"#120A0CE8",alignItems:"center",justifyContent:"center"},heartText:{fontSize:19,color:"#E35B7C"},cardTitle:{fontSize:12,fontWeight:"800",color:"#FFF0F3",marginTop:4},meta:{fontSize:10,color:"#BDA9B0",marginTop:3},more:{fontSize:11,color:"#BDA9B0",textAlign:"center",padding:12}});
+const s=StyleSheet.create({
+ wrap:{gap:12,backgroundColor:"#090607",padding:12,borderRadius:20},
+ eyebrow:{fontSize:10,letterSpacing:2,color:"#C34A68",fontWeight:"800"},
+ title:{fontSize:28,fontWeight:"800",color:"#FFF5F6"},
+ note:{fontSize:13,lineHeight:20,color:"#B9A6AC"},
+ search:{backgroundColor:"#1B1014",borderColor:"#49303A",borderWidth:1,borderRadius:12,padding:12,color:"#FFF0F3"},
+ row:{flexDirection:"row",gap:8},
+ tab:{paddingVertical:10,paddingHorizontal:14,borderRadius:20,backgroundColor:"#211317",borderWidth:1,borderColor:"#392129"},
+ active:{backgroundColor:"#70152D",borderColor:"#A92D4D"},
+ tabText:{fontSize:12,color:"#FFF",fontWeight:"700"},
+ chips:{gap:7,paddingVertical:3},
+ chip:{paddingVertical:8,paddingHorizontal:12,borderRadius:18,backgroundColor:"#211317",borderWidth:1,borderColor:"#392129"},
+ chipOn:{backgroundColor:"#78172F",borderColor:"#B53656"},
+ chipText:{fontSize:11,color:"#FFF"},
+ grid:{flexDirection:"row",flexWrap:"wrap",justifyContent:"space-between",gap:8},
+ card:{width:"48%",backgroundColor:"#160D10",borderRadius:16,padding:8,borderWidth:1,borderColor:"#43212D",overflow:"hidden"},
+ photo:{width:"100%",height:150,borderRadius:11,backgroundColor:"#2A1A20"},
+ heart:{position:"absolute",top:12,right:12,width:30,height:30,borderRadius:15,backgroundColor:"#120A0CE8",alignItems:"center",justifyContent:"center"},
+ heartText:{fontSize:19,color:"#E35B7C"},
+ cardTitle:{fontSize:12,fontWeight:"800",color:"#FFF0F3",marginTop:7},
+ meta:{fontSize:10,color:"#BDA9B0",marginTop:3},
+ empty:{fontSize:12,lineHeight:19,color:"#D2BFC5",padding:14,backgroundColor:"#211317",borderRadius:12},
+ moreButton:{backgroundColor:"#78172F",padding:14,borderRadius:12,alignItems:"center"},
+ moreText:{color:"#FFF",fontWeight:"800"},
+ error:{color:"#FF9AAE",fontSize:12},
+ viewer:{backgroundColor:"#160D10",borderRadius:16,padding:12},
+ close:{color:"#E7A8B8",fontWeight:"700",paddingVertical:8},
+ fullImage:{width:"100%",height:420,backgroundColor:"#20151A",borderRadius:12},
+});
