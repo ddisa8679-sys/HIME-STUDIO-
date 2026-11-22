@@ -400,9 +400,7 @@ export default function App() {
         {tab === "home" && <>
           <View style={styles.homeHero}>
             <Text style={styles.homeEyebrow}>{isClient ? "HIME BEAUTY CLUB" : "HIME PRO · ДЛЯ МАСТЕРОВ"}</Text>
-            <Text style={styles.homeHeroTitle}>{isClient ? "Твой следующий
-идеальный маникюр" : "Твоя работа.
-Твои клиенты."}</Text>
+            <Text style={styles.homeHeroTitle}>{isClient ? "Твой следующий\nидеальный маникюр" : "Твоя работа.\nТвои клиенты."}</Text>
             <Text style={styles.homeHeroText}>{isClient ? "Вдохновение, красивые идеи и мастера рядом — в одном месте." : "Портфолио, клиенты и записи — собери свою студию в HIME."}</Text>
             <View style={styles.homeHeroPill}><Text style={styles.homeHeroPillText}>{isClient ? "✦ НАЙДИ СВОЙ СТИЛЬ" : "✦ РАЗВИВАЙ СВОЙ БРЕНД"}</Text></View>
             <View style={styles.homeHeroOrnament}><Text style={styles.homeHeroFlower}>✿</Text><Text style={styles.homeHeroSpark}>✧</Text></View>
