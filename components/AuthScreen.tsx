@@ -69,7 +69,7 @@ export default function AuthScreen() {
   const redirectTo = Linking.createURL("auth/callback");
   const submit = async () => {
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) { Alert.alert("Нужен e-mail", "Введи свой действующий адрес электронной почты."); return; }
+    if (mode !== "recovery" && !normalizedEmail) { Alert.alert("Нужен e-mail", "Введи свой действующий адрес электронной почты."); return; }
     setBusy(true);
     try {
       if (mode === "signup") {
@@ -119,7 +119,7 @@ export default function AuthScreen() {
             <Text style={s.heading}>{heading}</Text>
             <Text style={s.description}>{description}</Text>
             {mode === "signup" && <Field label="Настоящее имя" value={name} onChangeText={setName} placeholder="Как тебя зовут" />}
-            <Field label="E-mail" value={email} onChangeText={setEmail} placeholder="name@example.com" keyboardType="email-address" autoCapitalize="none" />
+            {mode !== "recovery" && <Field label="E-mail" value={email} onChangeText={setEmail} placeholder="name@example.com" keyboardType="email-address" autoCapitalize="none" /> }
             {mode !== "forgot" && <>
               <Field label={mode === "recovery" ? "Новый пароль" : "Пароль"} value={password} onChangeText={setPassword} placeholder="Минимум 8 символов" secureTextEntry />
               {(mode === "signup" || mode === "recovery") && <Field label="Повтори пароль" value={repeatPassword} onChangeText={setRepeatPassword} placeholder="Ещё раз пароль" secureTextEntry />}
