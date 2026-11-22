@@ -4,11 +4,11 @@ import { supabase } from "../lib/supabase";
 
 type Tab = "users" | "reports" | "photos" | "support" | "subscriptions";
 type UserRow = { user_id: string; full_name: string; phone: string | null; role: string };
-type ReportRow = { id: string; reporter_id: string; target_user_id: string | null; target_type: string; category: string; details: string; status: string; created_at: string };
-type ThreadRow = { id: string; user_id: string; subject: string; status: string; updated_at: string };
-type MessageRow = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
+type ReportRow = { id: string; reporter_id: string; target_user_id: string | null; target_type: string; reason: string; details: string; status: string; created_at: string };
+type ThreadRow = { id: string; requester_id: string; subject: string; category: string; status: string; updated_at: string };
+type MessageRow = { id: string; ticket_id: string; sender_id: string; body: string; created_at: string };
 type PhotoRow = { id: string; master_id: string; media_path: string; caption: string | null; is_public: boolean };
-type SubscriptionRow = { id: string; user_id: string; plan: string; status: string; current_period_end: string | null };
+type SubscriptionRow = { user_id: string; plan: string; status: string; current_period_end: string; provider: string; };
 
 const burgundy = "#651D32";
 function Action({title,onPress,danger=false,secondary=false}:{title:string;onPress:()=>void;danger?:boolean;secondary?:boolean}) {
@@ -35,10 +35,10 @@ export default function AdminOperations() {
     if(gate.error || gate.data!==true) { setLoading(false); Alert.alert("Доступ закрыт","Сервер не подтвердил права администратора. Проверь миграцию и назначение владельца."); return; }
     const [u,r,p,t,sub]=await Promise.all([
       supabase.from("profiles").select("user_id,full_name,phone,role").order("created_at",{ascending:false}).limit(100),
-      supabase.from("hime_reports").select("id,reporter_id,target_user_id,target_type,category,details,status,created_at").order("created_at",{ascending:false}).limit(100),
+      supabase.from("hime_reports").select("id,reporter_id,target_user_id,target_type,reason,details,status,created_at").order("created_at",{ascending:false}).limit(100),
       supabase.from("portfolio_items").select("id,master_id,media_path,caption,is_public").order("created_at",{ascending:false}).limit(100),
-      supabase.from("hime_support_conversations").select("id,user_id,subject,status,updated_at").order("updated_at",{ascending:false}).limit(100),
-      supabase.from("hime_subscriptions").select("id,user_id,plan,status,current_period_end").order("created_at",{ascending:false}).limit(100)
+      supabase.from("hime_support_tickets").select("id,requester_id,subject,category,status,updated_at").order("updated_at",{ascending:false}).limit(100),
+      supabase.from("hime_subscription_entitlements").select("user_id,plan,status,current_period_end,provider").order("created_at",{ascending:false}).limit(100)
     ]);
     const errs=[u.error,r.error,p.error,t.error,sub.error].filter(Boolean);
     if(errs.length) Alert.alert("Часть разделов недоступна",errs.map(e=>e?.message).join("\n"));
@@ -66,8 +66,8 @@ export default function AdminOperations() {
       }}
     ]);
   };
-  const moderateReport=async(report:ReportRow,status:"reviewing"|"resolved"|"dismissed")=>{
-    const {error}=await supabase.from("hime_reports").update({status,updated_at:new Date().toISOString()}).eq("id",report.id);
+  const moderateReport=async(report:ReportRow,status:"in_review"|"action_taken"|"rejected")=>{
+    const {error}=await supabase.from("hime_reports").update({status,reviewed_at:new Date().toISOString(),reviewed_by:(await supabase.auth.getUser()).data.user?.id || null}).eq("id",report.id);
     if(error) Alert.alert("Ошибка",error.message); else {await audit("report_"+status,"report",report.id,"");void load();}
   };
   const hidePhoto=async(photo:PhotoRow)=>{
@@ -80,15 +80,15 @@ export default function AdminOperations() {
   };
   const openThread=async(thread:ThreadRow)=>{
     setSelectedThread(thread);setMessages([]);
-    const {data,error}=await supabase.from("hime_support_messages").select("id,conversation_id,sender_id,body,created_at").eq("conversation_id",thread.id).order("created_at");
+    const {data,error}=await supabase.from("hime_support_messages").select("id,ticket_id,sender_id,body,created_at").eq("ticket_id",thread.id).order("created_at");
     if(error) Alert.alert("Не удалось открыть переписку",error.message); else setMessages((data||[]) as MessageRow[]);
   };
   const sendReply=async()=>{
     if(!selectedThread || !reply.trim()) return;
     const {data}=await supabase.auth.getUser(); if(!data.user) return;
-    const {error}=await supabase.from("hime_support_messages").insert({conversation_id:selectedThread.id,sender_id:data.user.id,body:reply.trim()});
+    const {error}=await supabase.from("hime_support_messages").insert({ticket_id:selectedThread.id,sender_id:data.user.id,body:reply.trim()});
     if(error) Alert.alert("Не удалось отправить ответ",error.message);
-    else {setReply("");await supabase.from("hime_support_conversations").update({status:"in_progress",assigned_admin:data.user.id,updated_at:new Date().toISOString()}).eq("id",selectedThread.id);await audit("support_reply","conversation",selectedThread.id,"");void openThread(selectedThread);}
+    else {setReply("");await supabase.from("hime_support_tickets").update({status:"waiting_for_user",assigned_to:data.user.id,updated_at:new Date().toISOString()}).eq("id",selectedThread.id);await audit("support_reply","conversation",selectedThread.id,"");void openThread(selectedThread);}
   };
   const filtered=users.filter(u=>[u.full_name,u.phone||"",u.user_id].some(v=>v.toLowerCase().includes(query.toLowerCase())));
 
@@ -103,13 +103,13 @@ export default function AdminOperations() {
       {filtered.map(u=><Card key={u.user_id}><Text style={s.cardTitle}>{u.full_name} · {u.role}</Text><Text style={s.note}>{u.phone||"Телефон не указан"} · {u.user_id}</Text><View style={s.row}><Action title="Ограничить" secondary onPress={()=>moderateUser(u,"restricted")}/><Action title="Приостановить" danger onPress={()=>moderateUser(u,"suspended")}/><Action title="Снять ограничения" onPress={()=>moderateUser(u,"active")}/></View></Card>)}
       {!filtered.length&&<Text style={s.note}>Пользователи не найдены.</Text>}
     </>}
-    {tab==="reports"&&reports.map(r=><Card key={r.id}><Text style={s.cardTitle}>{r.category} · {r.target_type}</Text><Text style={s.note}>Жалоба: {r.id} · Цель: {r.target_user_id||"не указан"}</Text><Text style={s.body}>{r.details||"Без пояснения"}</Text><Text style={s.note}>Статус: {r.status} · {new Date(r.created_at).toLocaleString("ru-RU")}</Text><View style={s.row}><Action title="В работе" secondary onPress={()=>void moderateReport(r,"reviewing")}/><Action title="Решено" onPress={()=>void moderateReport(r,"resolved")}/><Action title="Отклонить" danger onPress={()=>void moderateReport(r,"dismissed")}/></View></Card>)}
+    {tab==="reports"&&reports.map(r=><Card key={r.id}><Text style={s.cardTitle}>{r.reason} · {r.target_type}</Text><Text style={s.note}>Жалоба: {r.id} · Цель: {r.target_user_id||"не указан"} · ID: {r.target_id||"—"}</Text><Text style={s.body}>{r.details||"Без пояснения"}</Text><Text style={s.note}>Статус: {r.status} · {new Date(r.created_at).toLocaleString("ru-RU")}</Text><View style={s.row}><Action title="В работе" secondary onPress={()=>void moderateReport(r,"in_review")}/><Action title="Решено" onPress={()=>void moderateReport(r,"action_taken")}/><Action title="Отклонить" danger onPress={()=>void moderateReport(r,"rejected")}/></View></Card>)}
     {tab==="photos"&&photos.map(p=><Card key={p.id}><Text style={s.cardTitle}>{p.caption||"Работа мастера"}</Text><Text style={s.note}>Мастер: {p.master_id} · {p.media_path}</Text><Text style={s.status}>{p.is_public?"Публичная":"Скрыта"}</Text>{p.is_public&&<Action title="Скрыть из портфолио" danger onPress={()=>void hidePhoto(p)}/>}</Card>)}
     {tab==="support"&&<>
-      {selectedThread?<Card><Action title="← Все обращения" secondary onPress={()=>setSelectedThread(null)}/><Text style={s.cardTitle}>{selectedThread.subject}</Text><Text style={s.note}>Пользователь: {selectedThread.user_id} · {selectedThread.status}</Text>{messages.map(m=><View key={m.id} style={s.message}><Text style={s.note}>{m.sender_id===selectedThread.user_id?"Пользователь":"Администратор"} · {new Date(m.created_at).toLocaleString("ru-RU")}</Text><Text style={s.body}>{m.body}</Text></View>)}<TextInput value={reply} onChangeText={setReply} multiline placeholder="Ответ пользователю" placeholderTextColor="#9B8D92" style={[s.input,s.textarea]}/><Action title="Отправить ответ" onPress={()=>void sendReply()}/></Card>:threads.map(t=><Card key={t.id}><Text style={s.cardTitle}>{t.subject}</Text><Text style={s.note}>{t.user_id} · {t.status}</Text><Action title="Открыть переписку" onPress={()=>void openThread(t)}/></Card>)}
+      {selectedThread?<Card><Action title="← Все обращения" secondary onPress={()=>setSelectedThread(null)}/><Text style={s.cardTitle}>{selectedThread.subject}</Text><Text style={s.note}>Пользователь: {selectedThread.requester_id} · {selectedThread.status}</Text>{messages.map(m=><View key={m.id} style={s.message}><Text style={s.note}>{m.sender_id===selectedThread.requester_id?"Пользователь":"Администратор"} · {new Date(m.created_at).toLocaleString("ru-RU")}</Text><Text style={s.body}>{m.body}</Text></View>)}<TextInput value={reply} onChangeText={setReply} multiline placeholder="Ответ пользователю" placeholderTextColor="#9B8D92" style={[s.input,s.textarea]}/><Action title="Отправить ответ" onPress={()=>void sendReply()}/></Card>:threads.map(t=><Card key={t.id}><Text style={s.cardTitle}>{t.subject}</Text><Text style={s.note}>{t.requester_id} · {t.status}</Text><Action title="Открыть переписку" onPress={()=>void openThread(t)}/></Card>)}
       {!threads.length&&<Text style={s.note}>Обращений пока нет.</Text>}
     </>}
-    {tab==="subscriptions"&&subscriptions.map(sub=><Card key={sub.id}><Text style={s.cardTitle}>{({premium_client:"PREMIUM CLIENT",pro_master:"HIME PRO MASTER",premium_all:"PREMIUM ALL"} as any)[sub.plan]||sub.plan}</Text><Text style={s.note}>Пользователь: {sub.user_id}</Text><Text style={s.status}>Статус: {sub.status}</Text><Text style={s.note}>Оплачено до: {sub.current_period_end||"не указано"}</Text></Card>)}
+    {tab==="subscriptions"&&subscriptions.map(sub=><Card key={sub.id}><Text style={s.cardTitle}>{({client_premium:"PREMIUM CLIENT",master_premium:"HIME PRO MASTER",hime_plus:"PREMIUM ALL"} as any)[sub.plan]||sub.plan}</Text><Text style={s.note}>Пользователь: {sub.user_id}</Text><Text style={s.status}>Статус: {sub.status}</Text><Text style={s.note}>Провайдер: {sub.provider} · Оплачено до: {sub.current_period_end||"не указано"}</Text></Card>)}
     <Text style={s.footnote}>Удаление аккаунта и блокировка входа требуют отдельного серверного Auth Admin endpoint. Сейчас панель меняет статус модерации внутри HIME и не удаляет учётные записи Supabase.</Text>
   </ScrollView>;
 }
