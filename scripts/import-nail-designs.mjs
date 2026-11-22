@@ -5,7 +5,7 @@
  * Required environment:
  *   SUPABASE_URL=https://<project-ref>.supabase.co
  *   SUPABASE_ANON_KEY=<publishable or legacy anon key>
- *   SUPABASE_ACCESS_TOKEN=<short-lived access token of a signed-in Supabase user>
+ *   (The legacy anon key is used as the public gateway JWT; no user token is needed.)
  *
  * Optional:
  *   TARGET=500
@@ -19,7 +19,6 @@
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, "");
 const API_KEY = process.env.SUPABASE_ANON_KEY;
-const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 const TARGET = Math.max(1, Number.parseInt(process.env.TARGET || "500", 10));
 const BATCH_SIZE = Math.min(20, Math.max(1, Number.parseInt(process.env.BATCH_SIZE || "20", 10)));
 const DELAY_MS = Math.max(250, Number.parseInt(process.env.DELAY_MS || "800", 10));
@@ -43,8 +42,8 @@ const categories = [
   "marble nails",
 ];
 
-if (!SUPABASE_URL || !API_KEY || !ACCESS_TOKEN) {
-  console.error("Missing SUPABASE_URL, SUPABASE_ANON_KEY, or SUPABASE_ACCESS_TOKEN.");
+if (!SUPABASE_URL || !API_KEY) {
+  console.error("Missing SUPABASE_URL or SUPABASE_ANON_KEY.");
   console.error("Set them as environment variables. Never use or share the service_role key.");
   process.exit(1);
 }
@@ -56,6 +55,7 @@ let totalFetched = 0;
 let totalSkipped = 0;
 let totalFailed = 0;
 let calls = 0;
+let catalogCount = 0;
 
 async function importBatch(category, page) {
   const body = { category, limit: BATCH_SIZE, page };
@@ -63,7 +63,7 @@ async function importBatch(category, page) {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${ACCESS_TOKEN}`,
+        "Authorization": `Bearer ${API_KEY}`,
         "apikey": API_KEY,
         "Content-Type": "application/json",
       },
@@ -89,7 +89,7 @@ console.log("Only CC0/Public Domain results are accepted by the server importer.
 
 for (const category of categories) {
   for (let page = 1; page <= 10; page++) {
-    if (totalImported >= TARGET) break;
+    if (catalogCount >= TARGET) break;
     try {
       const result = await importBatch(category, page);
       calls++;
@@ -98,6 +98,7 @@ for (const category of categories) {
       totalFetched += Number(result.fetched || 0);
       totalSkipped += Number(result.skipped || 0);
       totalFailed += Number(result.failed || 0);
+      catalogCount = Number(result.totalInCatalog || catalogCount);
 
       console.log(
         `[${calls}] ${category} | page ${page} | +${imported} imported | catalog: ${result.totalInCatalog ?? "unknown"} | fetched: ${result.fetched ?? "?"} | skipped: ${result.skipped ?? "?"} | failed: ${result.failed ?? "?"}`
@@ -112,18 +113,19 @@ for (const category of categories) {
     }
     await sleep(DELAY_MS);
   }
-  if (totalImported >= TARGET) break;
+  if (catalogCount >= TARGET) break;
 }
 
 console.log("\nImport run finished.");
 console.log(JSON.stringify({
-  target: TARGET,
+  targetCatalogCount: TARGET,
+  finalCatalogCount: catalogCount,
   importedThisRun: totalImported,
   fetched: totalFetched,
   skipped: totalSkipped,
   failed: totalFailed,
   requests: calls,
 }, null, 2));
-if (totalImported < TARGET) {
-  console.log("Target not reached. Re-run later; the importer skips already stored source URLs.");
+if (catalogCount < TARGET) {
+  console.log("Target catalog count not reached. Re-run later; the importer skips already stored source URLs.");
 }
