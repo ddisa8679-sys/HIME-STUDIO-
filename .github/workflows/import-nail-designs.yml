@@ -33,7 +33,7 @@ jobs:
         env:
           SUPABASE_URL: https://xtvjojfkphqbssafefyz.supabase.co
           # Legacy anon key is a public JWT key, not a service_role/secret key.
-          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0dmpvamZrcGhxYnNzYWZlZnl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxOTk5NzksImV4cCI6MjExMDc3NTk3OX0.iU_0D9cuIBqVzAbyM_GKHqzJV0zEHQH52az1OIA9VFfE
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0dmpvamZrcGhxYnNzYWZlZnl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxOTk5NzksImV4cCI6MjExMDc3NTk3OX0.iU_0D9cuIBqVzAbyM_GKHqzJV0zEHQ52az1OIA9VFfE
           TARGET: ${{ inputs.target_catalog }}
           BATCH_SIZE: "10"
           DELAY_MS: "1200"
