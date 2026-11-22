@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - .github/workflows/import-nail-designs.yml
+      - scripts/import-nail-designs.mjs
   workflow_dispatch:
     inputs:
       target_catalog:
