@@ -54,12 +54,17 @@ export default function AdminOperations() {
     await supabase.from("hime_admin_audit_log").insert({admin_id:data.user.id,action,target_type:targetType,target_id:targetId,reason});
   };
   const moderateUser=(user:UserRow,status:"suspended"|"restricted"|"active")=>{
-    Alert.prompt?.("Причина действия","Укажи причину для журнала действий",async(reason)=>{
-      const {data}=await supabase.auth.getUser(); if(!data.user) return;
-      const {error}=await supabase.from("hime_user_moderation").upsert({user_id:user.user_id,status,reason:reason||"",updated_by:data.user.id,updated_at:new Date().toISOString()});
-      if(error) Alert.alert("Не удалось изменить статус",error.message);
-      else { await audit("user_"+status,"user",user.user_id,reason||""); Alert.alert("Статус обновлён","Изменение записано в журнал. Это ограничительный статус внутри HIME, не блокировка входа в Supabase Auth."); }
-    });
+    const actionLabel=status==="active"?"Снять ограничения":status==="restricted"?"Ограничить аккаунт":"Приостановить аккаунт";
+    Alert.alert(actionLabel, "Подтвердить изменение статуса? Для подробного разбирательства добавь запись в жалобу.", [
+      {text:"Отмена",style:"cancel"},
+      {text:"Подтвердить",style:status==="suspended"?"destructive":"default",onPress:async()=>{
+        const {data}=await supabase.auth.getUser(); if(!data.user) return;
+        const reason="Решение администратора HIME";
+        const {error}=await supabase.from("hime_user_moderation").upsert({user_id:user.user_id,status,reason,updated_by:data.user.id,updated_at:new Date().toISOString()});
+        if(error) Alert.alert("Не удалось изменить статус",error.message);
+        else { await audit("user_"+status,"user",user.user_id,reason); Alert.alert("Статус обновлён","Изменение записано в журнал. Это ограничительный статус внутри HIME, не блокировка входа в Supabase Auth."); }
+      }}
+    ]);
   };
   const moderateReport=async(report:ReportRow,status:"reviewing"|"resolved"|"dismissed")=>{
     const {error}=await supabase.from("hime_reports").update({status,updated_at:new Date().toISOString()}).eq("id",report.id);
