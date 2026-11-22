@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Image, Alert, Modal } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Image, Alert, Modal, Animated, Easing } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import AuthScreen from "./components/AuthScreen";
 import StudioWorkspace from "./components/StudioWorkspace";
 import AdminWorkspace from "./components/AdminWorkspace";
+import PremiumScreen from "./components/PremiumScreen";
 import { HeroMascot } from "./components/HimeArtwork";
 import DesignCatalog from "./components/DesignCatalog";
 import SettingsScreen from "./components/SettingsScreen";
@@ -11,7 +12,7 @@ import { supabase } from "./lib/supabase";
 import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 type Role = "client" | "master";
-type Tab = "home" | "designs" | "masters" | "profile" | "workspace" | "settings" | "admin";
+type Tab = "home" | "designs" | "masters" | "profile" | "workspace" | "settings" | "admin" | "premium";
 type Post = { id: string | number; uri: string; kind: string; caption: string };
 type Price = { id: number; title: string; amount: string };
 type BookingService = { id: string; title: string; price: string; duration_minutes: number };
@@ -48,6 +49,11 @@ export default function App() {
   const [signedIn, setSignedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
+  const screenOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    screenOpacity.setValue(0);
+    Animated.timing(screenOpacity, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  }, [tab, screenOpacity]);
   const [city, setCity] = useState("Ногинск");
   const [cityId, setCityId] = useState<number | null>(null);
   const [cities, setCities] = useState<City[]>([]);
@@ -388,7 +394,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
       <View style={styles.topbar}><TouchableOpacity onPress={() => setTab("home")}><Text style={styles.back}>‹ Главная</Text></TouchableOpacity><View style={{ alignItems: "center" }}><Text style={styles.brandSmall}>HIME <Text style={styles.brandAccent}>STUDIO</Text></Text><Text style={styles.headerName}>{profileName || masterName || "Ваш профиль"}</Text></View><View style={{flexDirection:"row",alignItems:"center",gap:12}}>{isAdmin && <TouchableOpacity onPress={() => setTab("admin")}><Text style={[styles.roleTag,{color:burgundy}]}>АДМИН</Text></TouchableOpacity>}<TouchableOpacity onPress={signOut}><Text style={styles.roleTag}>ВЫЙТИ</Text></TouchableOpacity></View></View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <Animated.ScrollView contentContainerStyle={styles.content} style={{ opacity: screenOpacity }}>
         {tab === "home" && <>
           <View style={styles.homeHero}>
             <Text style={styles.homeEyebrow}>{isClient ? "HIME BEAUTY CLUB" : "HIME PRO · ДЛЯ МАСТЕРОВ"}</Text>
@@ -410,6 +416,7 @@ export default function App() {
             <SectionTitle title="Мастера рядом" />
             {masters.filter(m=>m.city.toLowerCase()===city.toLowerCase()).slice(0,1).map((m,i)=><MasterCard key={i} item={m} onPress={()=>{void openMaster(m);}} saved={saved.includes(m.user_id)} onToggleSaved={()=>{void toggleSaved(m.user_id);}} />)}
             <Button title="Найти мастера" onPress={()=>setTab("masters")}/><Button title="Мои записи и избранное" secondary onPress={()=>setTab("workspace")}/>
+            <Button title="HIME PREMIUM · Дополнительные возможности" secondary onPress={()=>setTab("premium")}/>
           </> : <>
             <View style={styles.proWelcomeCard}><Text style={styles.proWelcomeEyebrow}>ТВОЁ ПРОСТРАНСТВО</Text><Text style={styles.proWelcomeTitle}>Добро пожаловать в HIME PRO</Text><Text style={styles.proWelcomeText}>Оформи профиль, покажи лучшие работы и принимай записи в удобном кабинете.</Text><Button title="Оформить профиль мастера" onPress={()=>setTab("profile")}/></View>
             <SectionTitle title="Быстрые действия"/>
@@ -417,9 +424,11 @@ export default function App() {
             <SectionTitle title="Мой прайс"/><View style={styles.proPriceCard}>{prices.map(p=><View style={styles.proPriceRow} key={p.id}><Text style={styles.proPriceName}>{p.title}</Text><Text style={styles.proPriceAmount}>{p.amount} ₽</Text></View>)}<Button title="Редактировать прайс" secondary onPress={()=>setTab("profile")}/></View>
             <SectionTitle title="План развития"/>{["Заполни описание и услуги","Опубликуй портфолио","Укажи город и свободное время","Собирай отзывы клиентов"].map((s,i)=><View style={styles.step} key={s}><Text style={styles.stepNo}>0{i+1}</Text><Text style={styles.stepText}>{s}</Text></View>)}
             <Button title="Открыть календарь и записи" onPress={()=>setTab("workspace")}/>
+            <Button title="HIME PRO · Возможности подписки" secondary onPress={()=>setTab("premium")}/>
           </>}
         </>}
         {tab === "designs" && <DesignCatalog />}
+        {tab === "premium" && <PremiumScreen />}
         {tab === "masters" && <>
           <Text style={styles.kicker}>FIND YOUR NAIL ARTIST</Text><Text style={styles.pageTitle}>Каталог мастеров</Text><Text style={styles.body}>Поиск по городу. Смотри портфолио, рейтинг и отзывы перед записью.</Text>
           <TextInput value={query} onChangeText={setQuery} placeholder="Поиск по имени или услуге" style={styles.input} /><Text style={styles.small}>Город каталога: {city}</Text>
@@ -442,7 +451,7 @@ export default function App() {
           </>}
           <Button title="Сохранить профиль" onPress={() => { void saveProfile(); }} /><SectionTitle title="Настройки аккаунта" /><Text style={styles.small}>Текущая роль: {isClient ? "Клиент" : "Мастер"}. Изменить тип аккаунта можно здесь, в настройках профиля.</Text><Button title={isClient ? "Переключиться на мастера" : "Переключиться на клиента"} secondary onPress={() => { void chooseRole(isClient ? "master" : "client"); }} />
         </>}
-      </ScrollView>
+      </Animated.ScrollView>
       <View style={styles.nav}>
         {[["home","⌂","Главная"],["designs","✧","Дизайны"],["masters","♧","Мастера"],["workspace","▦","Кабинет"],["profile","♙","Профиль"],["settings","⚙","Настройки"]].map(([key, icon, label]) => <TouchableOpacity key={key} onPress={() => setTab(key as Tab)} style={styles.navItem}><Text style={[styles.navIcon,tab===key&&styles.navIconActive]}>{icon}</Text><Text style={[styles.navText, tab === key && styles.navTextActive]}>{label}</Text><View style={[styles.navDot, tab === key && styles.navDotActive]} /></TouchableOpacity>)}
       </View>
