@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 
 type Tab = "users" | "reports" | "photos" | "support" | "subscriptions";
 type UserRow = { user_id: string; full_name: string; phone: string | null; role: string };
-type ReportRow = { id: string; reporter_id: string; target_user_id: string | null; target_type: string; reason: string; details: string; status: string; created_at: string };
+type ReportRow = { id: string; reporter_id: string; target_user_id: string | null; target_type: string; target_id: string | null; reason: string; details: string; status: string; created_at: string };
 type ThreadRow = { id: string; requester_id: string; subject: string; category: string; status: string; updated_at: string };
 type MessageRow = { id: string; ticket_id: string; sender_id: string; body: string; created_at: string };
 type PhotoRow = { id: string; master_id: string; media_path: string; caption: string | null; is_public: boolean };
@@ -35,10 +35,10 @@ export default function AdminOperations() {
     if(gate.error || gate.data!==true) { setLoading(false); Alert.alert("Доступ закрыт","Сервер не подтвердил права администратора. Проверь миграцию и назначение владельца."); return; }
     const [u,r,p,t,sub]=await Promise.all([
       supabase.from("profiles").select("user_id,full_name,phone,role").order("created_at",{ascending:false}).limit(100),
-      supabase.from("hime_reports").select("id,reporter_id,target_user_id,target_type,reason,details,status,created_at").order("created_at",{ascending:false}).limit(100),
+      supabase.from("hime_reports").select("id,reporter_id,target_user_id,target_type,target_id,reason,details,status,created_at").order("created_at",{ascending:false}).limit(100),
       supabase.from("portfolio_items").select("id,master_id,media_path,caption,is_public").order("created_at",{ascending:false}).limit(100),
       supabase.from("hime_support_tickets").select("id,requester_id,subject,category,status,updated_at").order("updated_at",{ascending:false}).limit(100),
-      supabase.from("hime_subscription_entitlements").select("user_id,plan,status,current_period_end,provider").order("created_at",{ascending:false}).limit(100)
+      supabase.from("hime_subscription_entitlements").select("user_id,plan,status,current_period_end,provider").order("updated_at",{ascending:false}).limit(100)
     ]);
     const errs=[u.error,r.error,p.error,t.error,sub.error].filter(Boolean);
     if(errs.length) Alert.alert("Часть разделов недоступна",errs.map(e=>e?.message).join("\n"));
