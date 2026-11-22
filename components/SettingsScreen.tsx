@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { supabase } from "../lib/supabase";
+import SupportCenter from "./SupportCenter";
 
 type Props = { role: "client" | "master"; onSwitchRole: () => void; onSignOut: () => void };
 const burgundy = "#651D32", ink = "#171316", muted = "#8D8186";
@@ -13,7 +14,7 @@ function RowAction({icon,title,detail,onPress,danger=false}:{icon:string;title:s
  return <TouchableOpacity style={styles.actionRow} onPress={onPress}><View style={[styles.iconBox,danger&&styles.dangerBox]}><Text style={[styles.iconText,danger&&styles.dangerText]}>{icon}</Text></View><View style={styles.copy}><Text style={[styles.itemTitle,danger&&styles.dangerText]}>{title}</Text><Text style={styles.itemText}>{detail}</Text></View><Text style={styles.arrow}>›</Text></TouchableOpacity>;
 }
 export default function SettingsScreen({role,onSwitchRole,onSignOut}:Props) {
- const [language,setLanguage]=useState(detectLanguage),[languageOpen,setLanguageOpen]=useState(false);
+ const [language,setLanguage]=useState(detectLanguage),[languageOpen,setLanguageOpen]=useState(false),[supportOpen,setSupportOpen]=useState(false);
  const [bookingAlerts,setBookingAlerts]=useState(true),[messages,setMessages]=useState(true),[reminders,setReminders]=useState(true),[marketing,setMarketing]=useState(false);
  const [theme,setTheme]=useState("brand"),[compact,setCompact]=useState(false),[profilePublic,setProfilePublic]=useState(true),[portfolioPublic,setPortfolioPublic]=useState(true),[showCity,setShowCity]=useState(true),[loaded,setLoaded]=useState(false);
  const selectedLanguage=languages.find(x=>x.value===language)?.label || "Русский";
@@ -43,9 +44,10 @@ export default function SettingsScreen({role,onSwitchRole,onSignOut}:Props) {
    <SettingSwitch title="Показывать город" detail="Отображать город в публичном профиле мастера" value={showCity} onValueChange={v=>void setCityVisibility(v)}/><View style={styles.separator}/>
    <RowAction icon="◇" title="Безопасность аккаунта" detail="Советы по защите учётной записи" onPress={()=>Alert.alert("Безопасность","Используй уникальный пароль и никому не сообщай одноразовые коды.")}/>
   </View>
-  <Text style={styles.section}>Помощь и информация</Text><View style={styles.card}><RowAction icon="?" title="Помощь и поддержка" detail="Ответы на частые вопросы" onPress={()=>Alert.alert("Поддержка","Контактный канал поддержки нужно подключить отдельно.")}/><View style={styles.separator}/><RowAction icon="ⓘ" title="О приложении" detail="HIME STUDIO · информация о проекте" onPress={()=>Alert.alert("HIME STUDIO","Платформа для вдохновения, поиска мастеров и записи на маникюр.")}/></View>
+  <Text style={styles.section}>Помощь и информация</Text><View style={styles.card}><RowAction icon="?" title="Помощь и поддержка" detail="Ответы на частые вопросы" onPress={()=>setSupportOpen(true)}/><View style={styles.separator}/><RowAction icon="ⓘ" title="О приложении" detail="HIME STUDIO · информация о проекте" onPress={()=>Alert.alert("HIME STUDIO","Платформа для вдохновения, поиска мастеров и записи на маникюр.")}/></View>
   <Text style={styles.section}>Управление аккаунтом</Text><View style={styles.card}><RowAction icon="↪" title="Выйти из аккаунта" detail="Завершить текущий сеанс" onPress={onSignOut}/><View style={styles.separator}/><RowAction icon="⌫" title="Удалить аккаунт" detail="Необратимое удаление профиля и данных" danger onPress={deleteAccount}/></View>
   <Text style={styles.footer}>HIME STUDIO · BEAUTY STARTS HERE</Text>
+  <SupportCenter visible={supportOpen} onClose={()=>setSupportOpen(false)}/>
   <Modal visible={languageOpen} transparent animationType="fade" onRequestClose={()=>setLanguageOpen(false)}><View style={styles.modalBackdrop}><View style={styles.languageModal}><Text style={styles.modalTitle}>Выбери язык</Text><ScrollView>{languages.map(item=><TouchableOpacity key={item.value} style={styles.languageOption} onPress={()=>void chooseLanguage(item.value)}><Text style={styles.languageText}>{item.label}</Text><Text style={styles.themeCheck}>{language===item.value?"✓":""}</Text></TouchableOpacity>)}</ScrollView><TouchableOpacity style={styles.closeButton} onPress={()=>setLanguageOpen(false)}><Text style={styles.closeText}>Закрыть</Text></TouchableOpacity></View></View></Modal>
  </ScrollView>;
 }

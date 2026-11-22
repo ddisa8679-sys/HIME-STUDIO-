@@ -1,0 +1,19 @@
+name: Draft branch validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - draft/home-redesign-followups
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: TypeScript validation
+        run: npx tsc --noEmit
