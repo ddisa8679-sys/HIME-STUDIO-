@@ -19,8 +19,8 @@ This is an engineering status note, not a claim that the complete roadmap is imp
 ## Not yet complete or verified
 - The live Supabase project currently reports only one migration in its migration history. Its public schema currently lacks several tables queried by the app, including the admin/promotion, report, support and subscription tables. Do not treat the branch SQL as deployed.
 - The new migration has not been applied to a development database or tested against the live schema.
-- The user-facing report submission and support conversation screens are not yet wired to the new tables.
-- The admin UI still needs report triage, ticket inbox/replies, account search, photo moderation, safe booking moderation, and audit-log display.
+- Report submission currently covers master accounts only; individual photo/review reporting and reporter-facing report status are not yet wired.
+- The admin UI still needs safe booking moderation and an audit-log display. Account suspension is currently an internal HIME moderation status, not a Supabase Auth sign-in ban.
 - Permanent account deletion requires a separately secured server-side operation; it must not be implemented as a direct client delete against `auth.users`.
 - Premium plan presentation/entitlements are only schema groundwork. No payment provider, store billing, webhook verification, purchase restoration, or production prices are configured.
 - Smooth screen transitions, reduced-motion behavior, and every visible control still need device-level QA.
