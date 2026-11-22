@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { supabase } from "../lib/supabase";
+import AdminOperations from "./AdminOperations";
 
 type MasterRow = { user_id: string; display_name: string | null; is_visible: boolean };
 type PromotionRow = { id: string; master_id: string; plan: string; city: string; starts_on: string; ends_on: string; status: string; created_at: string };
@@ -20,7 +21,7 @@ export default function AdminWorkspace() {
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
-  const [section, setSection] = useState<"overview" | "promotions" | "masters" | "reviews" | "bookings">("overview");
+  const [section, setSection] = useState<"overview" | "promotions" | "masters" | "reviews" | "bookings" | "operations">("overview");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,8 +83,10 @@ export default function AdminWorkspace() {
   return <ScrollView style={s.wrap} contentContainerStyle={s.content}>
     <View style={s.header}><View><Text style={s.eyebrow}>HIME STUDIO · CONTROL</Text><Text style={s.title}>Админ-панель</Text></View><Action title={loading ? "Обновляем…" : "Обновить"} onPress={() => void load()} secondary/></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
-      {(["overview","promotions","masters","reviews","bookings"] as const).map(key => <TouchableOpacity key={key} onPress={() => setSection(key)} style={[s.tab, section === key && s.tabActive]}><Text style={[s.tabText, section === key && s.tabTextActive]}>{({overview:"Обзор",promotions:"Продвижение",masters:"Мастера",reviews:"Отзывы",bookings:"Записи"} as const)[key]}</Text></TouchableOpacity>)}
+      {(["overview","promotions","masters","reviews","bookings","operations"] as const).map(key => <TouchableOpacity key={key} onPress={() => setSection(key)} style={[s.tab, section === key && s.tabActive]}><Text style={[s.tabText, section === key && s.tabTextActive]}>{({overview:"Обзор",promotions:"Продвижение",masters:"Мастера",reviews:"Отзывы",bookings:"Записи",operations:"Пользователи и поддержка"} as const)[key]}</Text></TouchableOpacity>)}
     </ScrollView>
+
+    {section === "operations" && <AdminOperations />}
 
     {section === "overview" && <>
       <Text style={s.note}>Сводка платформы. Все действия проверяются серверными политиками доступа.</Text>
