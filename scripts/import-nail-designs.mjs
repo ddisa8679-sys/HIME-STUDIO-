@@ -24,22 +24,15 @@ const BATCH_SIZE = Math.min(20, Math.max(1, Number.parseInt(process.env.BATCH_SI
 const DELAY_MS = Math.max(250, Number.parseInt(process.env.DELAY_MS || "800", 10));
 
 const categories = [
-  "French manicure",
-  "nude nail art",
-  "burgundy nails",
-  "red nail art",
-  "almond shape nails",
-  "square nails",
-  "rhinestone nails",
-  "chrome nails",
-  "bridal manicure",
-  "floral nail art",
-  "minimalist manicure",
-  "short nail art",
-  "long nail art",
-  "geometric nail art",
-  "gradient nails",
-  "marble nails",
+  "French manicure", "nude nail art", "burgundy nails", "red nail art",
+  "almond shape nails", "square nails", "rhinestone nails", "chrome nails",
+  "bridal manicure", "floral nail art", "minimalist manicure", "short nail art",
+  "long nail art", "geometric nail art", "gradient nails", "marble nails",
+  "gel nail art", "nail polish art", "nail art close up", "manicure hands",
+  "summer nail art", "pink nail art", "black nail art", "blue nail art",
+  "glitter nails", "abstract nail art", "3d nail art", "nail extensions",
+  "gel manicure", "press on nails", "colorful nail art", "natural nails",
+  "elegant manicure", "holiday nail art", "ombre nails", "french tips",
 ];
 
 if (!SUPABASE_URL || !API_KEY) {
