@@ -6,7 +6,8 @@ The app contains an owner-only administration console. Admin access is granted o
 
 Apply the SQL migrations in timestamp order. The new admin/reporting/support schema is:
 
-- `20261123100000_admin_moderation_support.sql`
+- `20261123100000_reports_support_subscriptions_audit.sql`
+- `20261123110000_user_moderation_and_content_admin.sql`
 
 The earlier project migrations for calendar, bookings, reviews and promotions must also be applied first.
 
@@ -14,11 +15,11 @@ Important: Supabase changed Data API exposure defaults in 2026. After applying t
 
 - `hime_admins`
 - `hime_reports`
-- `hime_support_conversations`
+- `hime_support_tickets`
 - `hime_support_messages`
 - `hime_user_moderation`
 - `hime_admin_audit_log`
-- `hime_subscriptions`
+- `hime_subscription_entitlements`
 
 Keep RLS enabled. Do not expose service-role or secret keys to the mobile app.
 
@@ -59,7 +60,7 @@ where user_id = '00000000-0000-0000-0000-000000000000';
 - The current moderation status is an HIME application-level restriction. It does **not** revoke an existing Supabase Auth session or prevent sign-in. A server-side Auth Admin endpoint must be added and security-tested before claiming full account suspension.
 - Permanent Auth user deletion is not exposed in the mobile client. It must be performed server-side, with session revocation, audit logging, and a recovery/retention policy.
 - Subscription rows are entitlement records only. No payment provider, checkout, recurring billing, cancellation, or refunds are wired yet.
-- Support text messaging is implemented in the admin workspace. User-facing ticket creation, file attachments, push notifications, and realtime delivery still need to be connected.
+- The admin workspace has a ticket inbox and text replies. User-facing ticket creation, file attachments, push notifications, and realtime delivery still need to be connected.
 - Photo moderation hides portfolio entries; deleting Storage objects and moderating the imported nail-design catalog need a separate verified workflow.
 - Admin actions must be tested with a non-admin account before release.
 
