@@ -1,0 +1,14 @@
+import React,{useState} from "react";
+import {Alert,Modal,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from "react-native";
+import {supabase} from "../lib/supabase";
+const wine="#651D32";
+export default function ReportAccountModal({visible,targetUserId,onClose}:{visible:boolean;targetUserId:string|null;onClose:()=>void}){
+ const [reason,setReason]=useState("Нарушение правил"),[details,setDetails]=useState(""),[busy,setBusy]=useState(false);
+ const reasons=["Нарушение правил","Спам или мошенничество","Оскорбления или травля","Подозрительный контент","Фальшивый профиль","Другое"];
+ const submit=async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return Alert.alert("Нужен вход","Войди в аккаунт, чтобы отправить жалобу.");
+  setBusy(true);const {error}=await supabase.from("hime_reports").insert({reporter_id:user.id,target_user_id:targetUserId,target_type:"account",reason,details:details.trim()});setBusy(false);
+  if(error)Alert.alert("Не удалось отправить жалобу",error.message);else{Alert.alert("Жалоба отправлена","Она попадёт в очередь модерации. Сам факт жалобы не блокирует аккаунт.");setDetails("");onClose();}
+ };
+ return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={s.backdrop}><View style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled"><Text style={s.title}>Пожаловаться на аккаунт</Text><Text style={s.note}>Выбери причину. Жалобу рассмотрит модератор.</Text>{reasons.map(x=><TouchableOpacity key={x} onPress={()=>setReason(x)} style={[s.option,reason===x&&s.active]}><Text style={[s.optionText,reason===x&&s.activeText]}>{reason===x?"✓ ":""}{x}</Text></TouchableOpacity>)}<TextInput value={details} onChangeText={setDetails} placeholder="Подробности (необязательно)" multiline style={s.input}/><TouchableOpacity disabled={busy} style={s.button} onPress={()=>void submit()}><Text style={s.buttonText}>{busy?"Отправка…":"Отправить жалобу"}</Text></TouchableOpacity><TouchableOpacity style={s.cancel} onPress={onClose}><Text style={s.cancelText}>Отмена</Text></TouchableOpacity></ScrollView></View></View></Modal>;
+}
+const s=StyleSheet.create({backdrop:{flex:1,backgroundColor:"rgba(20,10,14,.5)",justifyContent:"flex-end"},sheet:{maxHeight:"85%",backgroundColor:"#FAF7F6",borderTopLeftRadius:22,borderTopRightRadius:22,padding:20},title:{fontSize:21,fontWeight:"800",color:"#171316"},note:{fontSize:11,color:"#8D8186",marginVertical:8},option:{padding:12,borderRadius:10,backgroundColor:"#FFF",marginTop:7},active:{backgroundColor:"#651D32"},optionText:{color:"#651D32",fontSize:12},activeText:{color:"#FFF"},input:{minHeight:90,textAlignVertical:"top",backgroundColor:"#FFF",borderRadius:10,padding:12,marginTop:12,color:"#171316"},button:{backgroundColor:wine,padding:14,borderRadius:10,alignItems:"center",marginTop:12},buttonText:{color:"#FFF",fontWeight:"800"},cancel:{padding:13,alignItems:"center"},cancelText:{color:wine,fontWeight:"700"}});
