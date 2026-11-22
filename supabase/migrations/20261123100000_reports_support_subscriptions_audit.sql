@@ -79,8 +79,9 @@ create index if not exists hime_support_messages_ticket_idx on public.hime_suppo
 alter table public.hime_support_tickets enable row level security;
 alter table public.hime_support_messages enable row level security;
 revoke all on public.hime_support_tickets, public.hime_support_messages from anon;
-grant select, insert, update on public.hime_support_tickets to authenticated;
-grant select, insert, update on public.hime_support_messages to authenticated;
+grant select, insert on public.hime_support_tickets to authenticated;
+grant update on public.hime_support_tickets to authenticated;
+grant select, insert on public.hime_support_messages to authenticated;
 drop policy if exists "Requester and admins read support tickets" on public.hime_support_tickets;
 create policy "Requester and admins read support tickets" on public.hime_support_tickets
   for select to authenticated using (requester_id = (select auth.uid()) or public.hime_is_admin());
@@ -88,10 +89,9 @@ drop policy if exists "Users create own support tickets" on public.hime_support_
 create policy "Users create own support tickets" on public.hime_support_tickets
   for insert to authenticated with check (requester_id = (select auth.uid()));
 drop policy if exists "Requester and admins update support tickets" on public.hime_support_tickets;
-create policy "Requester and admins update support tickets" on public.hime_support_tickets
-  for update to authenticated
-  using (requester_id = (select auth.uid()) or public.hime_is_admin())
-  with check (requester_id = (select auth.uid()) or public.hime_is_admin());
+drop policy if exists "Admins update support tickets" on public.hime_support_tickets;
+create policy "Admins update support tickets" on public.hime_support_tickets
+  for update to authenticated using (public.hime_is_admin()) with check (public.hime_is_admin());
 drop policy if exists "Ticket participants read messages" on public.hime_support_messages;
 create policy "Ticket participants read messages" on public.hime_support_messages
   for select to authenticated using (
@@ -111,16 +111,6 @@ create policy "Ticket participants send messages" on public.hime_support_message
     )
   );
 drop policy if exists "Ticket participants update read state" on public.hime_support_messages;
-create policy "Ticket participants update read state" on public.hime_support_messages
-  for update to authenticated
-  using (public.hime_is_admin() or exists (
-    select 1 from public.hime_support_tickets t
-    where t.id = ticket_id and t.requester_id = (select auth.uid())
-  ))
-  with check (public.hime_is_admin() or exists (
-    select 1 from public.hime_support_tickets t
-    where t.id = ticket_id and t.requester_id = (select auth.uid())
-  ));
 
 create table if not exists public.hime_subscription_entitlements (
   user_id uuid primary key references auth.users(id) on delete cascade,
